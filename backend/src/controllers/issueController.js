@@ -1,5 +1,9 @@
 const pool = require('../config/db');
 
+const {
+  generateAlertForIssue
+} = require('../services/alertService');
+
 const VALID_CATEGORIES = [
   'Road Damage',
   'Road Safety',
@@ -119,9 +123,7 @@ const createIssue = async (req, res) => {
     }
 
     // Category validation
-    if (
-      !VALID_CATEGORIES.includes(category)
-    ) {
+    if (!VALID_CATEGORIES.includes(category)) {
       return res.status(400).json({
         success: false,
         message:
@@ -155,9 +157,7 @@ const createIssue = async (req, res) => {
     }
 
     // Latitude validation
-    if (
-      !Number.isFinite(numericLatitude)
-    ) {
+    if (!Number.isFinite(numericLatitude)) {
       return res.status(400).json({
         success: false,
         message:
@@ -177,9 +177,7 @@ const createIssue = async (req, res) => {
     }
 
     // Longitude validation
-    if (
-      !Number.isFinite(numericLongitude)
-    ) {
+    if (!Number.isFinite(numericLongitude)) {
       return res.status(400).json({
         success: false,
         message:
@@ -199,9 +197,7 @@ const createIssue = async (req, res) => {
     }
 
     // Severity validation
-    if (
-      !VALID_SEVERITIES.includes(severity)
-    ) {
+    if (!VALID_SEVERITIES.includes(severity)) {
       return res.status(400).json({
         success: false,
         message:
@@ -209,6 +205,7 @@ const createIssue = async (req, res) => {
       });
     }
 
+    // Create issue
     const query = `
       INSERT INTO issues (
         title,
@@ -249,17 +246,27 @@ const createIssue = async (req, res) => {
       severity
     ];
 
-    const result =
-      await pool.query(
-        query,
-        values
+    const result = await pool.query(
+      query,
+      values
+    );
+
+    const createdIssue = result.rows[0];
+
+    // Generate automatic alert
+    const alert =
+      await generateAlertForIssue(
+        createdIssue
       );
 
     return res.status(201).json({
       success: true,
       message:
         'Infrastructure issue created successfully.',
-      data: result.rows[0]
+      data: {
+        issue: createdIssue,
+        alert
+      }
     });
   } catch (err) {
     console.error(
@@ -299,9 +306,7 @@ const updateIssueStatus = async (
       });
     }
 
-    if (
-      !VALID_STATUSES.includes(status)
-    ) {
+    if (!VALID_STATUSES.includes(status)) {
       return res.status(400).json({
         success: false,
         message:
@@ -325,11 +330,10 @@ const updateIssueStatus = async (
         created_at;
     `;
 
-    const result =
-      await pool.query(
-        query,
-        [status, issueId]
-      );
+    const result = await pool.query(
+      query,
+      [status, issueId]
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({

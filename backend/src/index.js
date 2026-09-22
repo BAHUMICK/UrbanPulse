@@ -5,6 +5,7 @@ require('dotenv').config();
 const healthRoutes = require('./routes/healthRoutes');
 const issueRoutes = require('./routes/issueRoutes');
 const intelligenceRoutes = require('./routes/intelligenceRoutes');
+const alertRoutes = require('./routes/alertRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -17,6 +18,7 @@ app.use(express.json());
 app.use('/api', healthRoutes);
 app.use('/api', issueRoutes);
 app.use('/api', intelligenceRoutes);
+app.use('/api/alerts', alertRoutes);
 
 // Fallback for unmatched routes
 app.use((req, res) => {

@@ -6,22 +6,48 @@ import React, {
 
 import {
   getIssues,
-  getImpactIssues
+  getImpactIssues,
+  getActiveAlerts,
+  updateAlertStatus
 } from '../services/api';
 
 import PriorityIntelligence from '../components/PriorityIntelligence';
 
 function Dashboard() {
-  const [issues, setIssues] = useState([]);
-  const [impactIssues, setImpactIssues] = useState([]);
+  // =========================================
+  // STATE
+  // =========================================
 
-  const [loading, setLoading] = useState(true);
+  const [issues, setIssues] = useState([]);
+  const [impactIssues, setImpactIssues] =
+    useState([]);
+  const [activeAlerts, setActiveAlerts] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
   const [impactLoading, setImpactLoading] =
     useState(true);
 
-  const [error, setError] = useState('');
+  const [alertLoading, setAlertLoading] =
+    useState(true);
+
+  const [updatingAlertId, setUpdatingAlertId] =
+    useState(null);
+
+  const [error, setError] =
+    useState('');
+
   const [impactError, setImpactError] =
     useState('');
+
+  const [alertError, setAlertError] =
+    useState('');
+
+  // =========================================
+  // LOAD ISSUES
+  // =========================================
 
   async function loadIssues() {
     try {
@@ -41,11 +67,16 @@ function Dashboard() {
     }
   }
 
+  // =========================================
+  // LOAD IMPACT INTELLIGENCE
+  // =========================================
+
   async function loadImpactIssues() {
     try {
       setImpactLoading(true);
 
-      const data = await getImpactIssues();
+      const data =
+        await getImpactIssues();
 
       setImpactIssues(data);
       setImpactError('');
@@ -59,16 +90,80 @@ function Dashboard() {
     }
   }
 
+  // =========================================
+  // LOAD ACTIVE ALERTS
+  // =========================================
+
+  async function loadActiveAlerts() {
+    try {
+      setAlertLoading(true);
+
+      const data =
+        await getActiveAlerts();
+
+      setActiveAlerts(data);
+      setAlertError('');
+    } catch (err) {
+      setAlertError(
+        err.message ||
+          'Failed to load active alerts'
+      );
+    } finally {
+      setAlertLoading(false);
+    }
+  }
+
+  // =========================================
+  // LOAD COMPLETE DASHBOARD
+  // =========================================
+
   async function loadDashboard() {
     await Promise.all([
       loadIssues(),
-      loadImpactIssues()
+      loadImpactIssues(),
+      loadActiveAlerts()
     ]);
   }
+
+  // =========================================
+  // UPDATE ALERT STATUS
+  // =========================================
+
+  async function handleAlertStatusChange(
+    alertId,
+    status
+  ) {
+    try {
+      setUpdatingAlertId(alertId);
+      setAlertError('');
+
+      await updateAlertStatus(
+        alertId,
+        status
+      );
+
+      await loadActiveAlerts();
+    } catch (err) {
+      setAlertError(
+        err.message ||
+          'Failed to update alert status'
+      );
+    } finally {
+      setUpdatingAlertId(null);
+    }
+  }
+
+  // =========================================
+  // INITIAL LOAD
+  // =========================================
 
   useEffect(() => {
     loadDashboard();
   }, []);
+
+  // =========================================
+  // ISSUE STATISTICS
+  // =========================================
 
   const total = issues.length;
 
@@ -107,8 +202,16 @@ function Dashboard() {
   const highPriority =
     critical + high;
 
+  // =========================================
+  // RECENT ISSUES
+  // =========================================
+
   const recentIssues =
     issues.slice(0, 5);
+
+  // =========================================
+  // IMPACT STATISTICS
+  // =========================================
 
   const highestImpactIssue =
     impactIssues.length > 0
@@ -118,7 +221,8 @@ function Dashboard() {
   const criticalImpactCount =
     impactIssues.filter(
       (issue) =>
-        issue.impactLevel === 'Critical'
+        issue.impactLevel ===
+        'Critical'
     ).length;
 
   const highImpactCount =
@@ -132,19 +236,35 @@ function Dashboard() {
       return impactIssues.slice(0, 3);
     }, [impactIssues]);
 
+  // =========================================
+  // IMPACT CLASS
+  // =========================================
+
   function getImpactClass(level) {
     return (
       `dashboard-impact-level impact-${level.toLowerCase()}`
     );
   }
 
-  if (loading || impactLoading) {
+  // =========================================
+  // LOADING
+  // =========================================
+
+  if (
+    loading ||
+    impactLoading ||
+    alertLoading
+  ) {
     return (
       <div className="loading">
         Loading UrbanPulse intelligence...
       </div>
     );
   }
+
+  // =========================================
+  // MAIN ERROR
+  // =========================================
 
   if (error) {
     return (
@@ -165,14 +285,22 @@ function Dashboard() {
     );
   }
 
+  // =========================================
+  // DASHBOARD
+  // =========================================
+
   return (
     <div>
-      {/* HERO */}
+
+      {/* =====================================
+          HERO
+      ====================================== */}
 
       <section className="hero">
         <div>
           <p className="eyebrow">
-            CITY INFRASTRUCTURE INTELLIGENCE
+            CITY INFRASTRUCTURE
+            INTELLIGENCE
           </p>
 
           <h2>
@@ -189,13 +317,20 @@ function Dashboard() {
         </div>
       </section>
 
-      {/* CORE STATISTICS */}
+      {/* =====================================
+          CORE STATISTICS
+      ====================================== */}
 
       <section className="stats-grid">
-        <div className="stat-card">
-          <span>Total Issues</span>
 
-          <strong>{total}</strong>
+        <div className="stat-card">
+          <span>
+            Total Issues
+          </span>
+
+          <strong>
+            {total}
+          </strong>
 
           <small>
             All reported infrastructure
@@ -204,9 +339,13 @@ function Dashboard() {
         </div>
 
         <div className="stat-card">
-          <span>Critical Issues</span>
+          <span>
+            Critical Issues
+          </span>
 
-          <strong>{critical}</strong>
+          <strong>
+            {critical}
+          </strong>
 
           <small>
             Issues requiring urgent
@@ -215,9 +354,13 @@ function Dashboard() {
         </div>
 
         <div className="stat-card">
-          <span>Reported</span>
+          <span>
+            Reported
+          </span>
 
-          <strong>{reported}</strong>
+          <strong>
+            {reported}
+          </strong>
 
           <small>
             Awaiting resolution
@@ -225,19 +368,27 @@ function Dashboard() {
         </div>
 
         <div className="stat-card">
-          <span>In Progress</span>
+          <span>
+            In Progress
+          </span>
 
-          <strong>{inProgress}</strong>
+          <strong>
+            {inProgress}
+          </strong>
 
           <small>
             Currently being addressed
           </small>
         </div>
+
       </section>
 
-      {/* INTELLIGENCE OVERVIEW */}
+      {/* =====================================
+          INTELLIGENCE OVERVIEW
+      ====================================== */}
 
       <section className="dashboard-intelligence-grid">
+
         <div className="dashboard-intelligence-card">
           <span>
             High Priority
@@ -282,28 +433,215 @@ function Dashboard() {
 
         <div className="dashboard-intelligence-card">
           <span>
-            Resolution Rate
+            Active Alerts
           </span>
 
           <strong>
-            {resolutionRate}%
+            {activeAlerts.length}
           </strong>
 
           <small>
-            {resolved} resolved issue
-            {resolved !== 1 ? 's' : ''}
+            Automatically generated alerts
           </small>
         </div>
+
       </section>
 
-      {/* PRIORITY INTELLIGENCE */}
+      {/* =====================================
+          PRIORITY INTELLIGENCE
+      ====================================== */}
 
       <PriorityIntelligence />
 
-      {/* IMPACT INTELLIGENCE */}
+      {/* =====================================
+          ACTIVE ALERTS
+      ====================================== */}
+
+      <section className="panel dashboard-alert-panel">
+
+        <div className="panel-header">
+
+          <div>
+            <p className="eyebrow">
+              AUTOMATIC ALERT ENGINE
+            </p>
+
+            <h3>
+              Active Infrastructure Alerts
+            </h3>
+
+            <p>
+              Automatically generated alerts
+              requiring infrastructure attention.
+            </p>
+          </div>
+
+          <button
+            className="secondary-button"
+            onClick={loadActiveAlerts}
+            disabled={alertLoading}
+          >
+            {alertLoading
+              ? 'Refreshing...'
+              : 'Refresh'}
+          </button>
+
+        </div>
+
+        {/* ALERT ERROR */}
+
+        {alertError && (
+          <div className="error-box">
+            {alertError}
+          </div>
+        )}
+
+        {/* NO ALERTS */}
+
+        {!alertError &&
+          !alertLoading &&
+          activeAlerts.length === 0 && (
+            <div className="empty-state">
+              No active infrastructure
+              alerts.
+            </div>
+          )}
+
+        {/* ALERT LIST */}
+
+        {!alertError &&
+          !alertLoading &&
+          activeAlerts.length > 0 && (
+
+            <div className="dashboard-alert-list">
+
+              {activeAlerts.map(
+                (alert) => (
+
+                  <div
+                    className="dashboard-alert-row"
+                    key={alert.id}
+                  >
+
+                    {/* ALERT INFORMATION */}
+
+                    <div className="dashboard-alert-info">
+
+                      <strong>
+                        {alert.title}
+                      </strong>
+
+                      <span>
+                        {alert.category}
+                        {' · '}
+                        {alert.severity}
+                      </span>
+
+                      <small>
+                        {alert.authority}
+                      </small>
+
+                      <small>
+                        Issue #{alert.issue_id}
+                      </small>
+
+                    </div>
+
+                    {/* PRIORITY SCORE */}
+
+                    <div className="dashboard-alert-score">
+
+                      <strong>
+                        {alert.priority_score}
+                      </strong>
+
+                      <span>
+                        Priority
+                      </span>
+
+                    </div>
+
+                    {/* STATUS */}
+
+                    <span
+                      className={`badge ${alert.severity.toLowerCase()}`}
+                    >
+                      {alert.status}
+                    </span>
+
+                    {/* ACTIONS */}
+
+                    <div className="alert-actions">
+
+                      {alert.status ===
+                        'Active' && (
+
+                        <button
+                          className="secondary-button"
+                          disabled={
+                            updatingAlertId ===
+                            alert.id
+                          }
+                          onClick={() =>
+                            handleAlertStatusChange(
+                              alert.id,
+                              'Acknowledged'
+                            )
+                          }
+                        >
+                          {updatingAlertId ===
+                          alert.id
+                            ? 'Updating...'
+                            : 'Acknowledge'}
+                        </button>
+
+                      )}
+
+                      {alert.status ===
+                        'Acknowledged' && (
+
+                        <button
+                          className="primary-button"
+                          disabled={
+                            updatingAlertId ===
+                            alert.id
+                          }
+                          onClick={() =>
+                            handleAlertStatusChange(
+                              alert.id,
+                              'Resolved'
+                            )
+                          }
+                        >
+                          {updatingAlertId ===
+                          alert.id
+                            ? 'Updating...'
+                            : 'Resolve'}
+                        </button>
+
+                      )}
+
+                    </div>
+
+                  </div>
+
+                )
+              )}
+
+            </div>
+
+          )}
+
+      </section>
+
+      {/* =====================================
+          IMPACT INTELLIGENCE
+      ====================================== */}
 
       <section className="panel dashboard-impact-panel">
+
         <div className="panel-header">
+
           <div>
             <p className="eyebrow">
               IMPACT INTELLIGENCE
@@ -326,6 +664,7 @@ function Dashboard() {
           >
             Refresh
           </button>
+
         </div>
 
         {impactError && (
@@ -336,9 +675,15 @@ function Dashboard() {
 
         {!impactError &&
           highestImpactIssue && (
+
             <>
+
+              {/* TOP IMPACT */}
+
               <div className="top-impact-card">
+
                 <div>
+
                   <span className="impact-card-label">
                     TOP IMPACT ISSUE
                   </span>
@@ -352,9 +697,11 @@ function Dashboard() {
                     {' · '}
                     {highestImpactIssue.status}
                   </p>
+
                 </div>
 
                 <div className="top-impact-score">
+
                   <strong>
                     {highestImpactIssue.impactScore}
                   </strong>
@@ -362,17 +709,25 @@ function Dashboard() {
                   <span>
                     Impact Score
                   </span>
+
                 </div>
+
               </div>
 
+              {/* IMPACT LIST */}
+
               <div className="dashboard-impact-list">
+
                 {topImpactIssues.map(
                   (issue) => (
+
                     <div
                       className="dashboard-impact-row"
                       key={issue.id}
                     >
+
                       <div className="dashboard-impact-info">
+
                         <strong>
                           {issue.title}
                         </strong>
@@ -380,6 +735,7 @@ function Dashboard() {
                         <span>
                           {issue.category}
                         </span>
+
                       </div>
 
                       <span
@@ -393,19 +749,30 @@ function Dashboard() {
                       <strong className="dashboard-impact-score">
                         {issue.impactScore}
                       </strong>
+
                     </div>
+
                   )
                 )}
+
               </div>
+
             </>
+
           )}
+
       </section>
 
-      {/* INFRASTRUCTURE HEALTH */}
+      {/* =====================================
+          INFRASTRUCTURE HEALTH
+      ====================================== */}
 
       <section className="panel">
+
         <div className="panel-header">
+
           <div>
+
             <p className="eyebrow">
               SYSTEM OVERVIEW
             </p>
@@ -419,10 +786,13 @@ function Dashboard() {
               current city infrastructure
               situation.
             </p>
+
           </div>
+
         </div>
 
         <div className="dashboard-health-grid">
+
           <div>
             <span>
               Critical / High Issues
@@ -479,14 +849,21 @@ function Dashboard() {
               Overall resolution rate
             </small>
           </div>
+
         </div>
+
       </section>
 
-      {/* RECENT ISSUES */}
+      {/* =====================================
+          RECENT ISSUES
+      ====================================== */}
 
       <section className="panel">
+
         <div className="panel-header">
+
           <div>
+
             <h3>
               Recent Infrastructure Issues
             </h3>
@@ -495,6 +872,7 @@ function Dashboard() {
               Latest records from the
               UrbanPulse database
             </p>
+
           </div>
 
           <button
@@ -503,16 +881,21 @@ function Dashboard() {
           >
             Refresh
           </button>
+
         </div>
 
         <div className="issue-list">
+
           {recentIssues.map(
             (issue) => (
+
               <div
                 className="issue-row"
                 key={issue.id}
               >
+
                 <div>
+
                   <h4>
                     {issue.title}
                   </h4>
@@ -520,6 +903,7 @@ function Dashboard() {
                   <p>
                     {issue.category}
                   </p>
+
                 </div>
 
                 <span
@@ -531,11 +915,16 @@ function Dashboard() {
                 <span className="status">
                   {issue.status}
                 </span>
+
               </div>
+
             )
           )}
+
         </div>
+
       </section>
+
     </div>
   );
 }

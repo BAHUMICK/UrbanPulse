@@ -1,108 +1,260 @@
-.app-container {
-  display: flex;
-  flex-direction: column;
+/* =========================================
+   URBANPULSE APP UI
+   UI ONLY — NO LOGIC
+========================================= */
+
+#root {
   min-height: 100vh;
 }
 
-.main-content {
-  flex: 1;
-  padding: 24px;
-  max-width: 1200px;
-  margin: 0 auto;
-  width: 100%;
+.app {
+  position: relative;
+  min-height: 100vh;
 }
 
-.card {
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 20px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+/* subtle technical atmosphere */
+.app::before {
+  content: "";
+
+  position: fixed;
+  inset: 0;
+
+  pointer-events: none;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(56, 189, 248, 0.018) 50%,
+      transparent 100%
+    );
+
+  z-index: -1;
 }
 
-.card h2 {
-  color: #38bdf8;
-  margin-bottom: 12px;
-  font-size: 1.3rem;
+/* =========================================
+   BORDERED COMMAND CENTER FEEL
+========================================= */
+
+.panel,
+.page-heading,
+.stat-card,
+.map-summary-card,
+.issue-summary-card,
+.dashboard-intelligence-card,
+.analytics-card,
+.form-card,
+.issue-row,
+.dashboard-alert-row {
+  position: relative;
 }
 
-.status-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-size: 0.8rem;
-  font-weight: 600;
+/* small top accent */
+.panel::before,
+.page-heading::before,
+.form-card::before {
+  content: "";
+
+  position: absolute;
+
+  top: -1px;
+  left: 18px;
+
+  width: 45px;
+  height: 2px;
+
+  background: #38bdf8;
+
+  opacity: 0.7;
+
+  border-radius: 0 0 4px 4px;
 }
 
-.status-online {
-  background: #064e3b;
-  color: #34d399;
+/* =========================================
+   DASHBOARD STAT CARDS
+========================================= */
+
+.stat-card {
+  overflow: hidden;
 }
 
-.status-offline {
-  background: #7f1d1d;
-  color: #f87171;
+.stat-card::after {
+  content: "";
+
+  position: absolute;
+
+  right: 0;
+  bottom: 0;
+
+  width: 70px;
+  height: 70px;
+
+  border-top: 1px solid rgba(56, 189, 248, 0.08);
+  border-left: 1px solid rgba(56, 189, 248, 0.08);
+
+  pointer-events: none;
 }
 
-.placeholder-box {
-  background: #0f172a;
-  border: 2px dashed #334155;
-  border-radius: 8px;
-  padding: 32px;
-  text-align: center;
-  color: #94a3b8;
-  margin-top: 16px;
+/* =========================================
+   INTELLIGENCE CARDS
+========================================= */
+
+.dashboard-intelligence-card,
+.analytics-card {
+  overflow: hidden;
 }
 
-.navbar {
-  background: #1e293b;
-  border-bottom: 1px solid #334155;
-  padding: 16px 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.dashboard-intelligence-card::before,
+.analytics-card::before {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  left: 0;
+
+  width: 3px;
+  height: 100%;
+
+  background: #243244;
 }
 
-.navbar-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+/* =========================================
+   ALERT VISUAL HIERARCHY
+========================================= */
+
+.dashboard-alert-row {
+  position: relative;
+  overflow: hidden;
 }
 
-.navbar-brand h1 {
-  font-size: 1.4rem;
-  color: #38bdf8;
-  font-weight: 700;
+.dashboard-alert-row::after {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  right: 0;
+
+  width: 1px;
+  height: 100%;
+
+  background: rgba(255, 255, 255, 0.035);
+
+  pointer-events: none;
 }
 
-.navbar-brand span {
-  font-size: 0.85rem;
-  color: #94a3b8;
+/* =========================================
+   MAP FRAME
+========================================= */
+
+.map-frame {
+  position: relative;
 }
 
-.nav-links {
-  display: flex;
-  gap: 8px;
-}
+.map-frame::before {
+  content: "LIVE INFRASTRUCTURE MAP";
 
-.nav-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  color: #cbd5e1;
-  padding: 8px 16px;
+  position: absolute;
+
+  top: 12px;
+  left: 12px;
+
+  z-index: 500;
+
+  padding: 6px 9px;
+
+  color: #c8f0ff;
+
+  background: rgba(7, 11, 18, 0.88);
+
+  border: 1px solid #294457;
   border-radius: 6px;
-  font-size: 0.95rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
+
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+
+  pointer-events: none;
 }
 
-.nav-btn:hover {
-  background: #334155;
-  color: #ffffff;
+/* =========================================
+   NAVIGATION DETAIL
+========================================= */
+
+.navigation {
+  scrollbar-width: thin;
+  scrollbar-color: #263548 transparent;
 }
 
-.nav-btn.active {
-  background: #0284c7;
-  color: #ffffff;
+.navigation::-webkit-scrollbar {
+  height: 4px;
+}
+
+/* =========================================
+   BUTTON DETAIL
+========================================= */
+
+.primary-button,
+.secondary-button,
+.danger-button,
+.nav-button {
+  user-select: none;
+}
+
+.primary-button:focus-visible,
+.secondary-button:focus-visible,
+.danger-button:focus-visible,
+.nav-button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+/* =========================================
+   CLEAN CARD HEADERS
+========================================= */
+
+.panel-header > div:first-child h3 {
+  letter-spacing: -0.2px;
+}
+
+.panel-header > div:first-child p {
+  line-height: 1.4;
+}
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 760px) {
+  .panel::before,
+  .page-heading::before,
+  .form-card::before {
+    left: 14px;
+    width: 35px;
+  }
+
+  .map-frame::before {
+    top: 8px;
+    left: 8px;
+
+    font-size: 9px;
+  }
+}
+
+/* =========================================
+   ACCESSIBILITY
+========================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-card:hover,
+  .map-summary-card:hover,
+  .issue-summary-card:hover,
+  .dashboard-intelligence-card:hover,
+  .analytics-card:hover {
+    transform: none;
+  }
 }

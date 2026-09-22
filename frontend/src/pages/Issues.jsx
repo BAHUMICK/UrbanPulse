@@ -11,28 +11,24 @@ import {
   updateIssueStatus
 } from '../services/api';
 
+import { useSearchParams } from 'react-router-dom';
+
 function Issues() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [issues, setIssues] = useState([]);
-  const [priorityIssues, setPriorityIssues] =
-    useState([]);
-  const [impactIssues, setImpactIssues] =
-    useState([]);
+  const [priorityIssues, setPriorityIssues] = useState([]);
+  const [impactIssues, setImpactIssues] = useState([]);
 
-  const [loading, setLoading] =
-    useState(true);
-
+  const [loading, setLoading] = useState(true);
   const [intelligenceLoading, setIntelligenceLoading] =
     useState(true);
 
-  const [error, setError] =
-    useState('');
-
+  const [error, setError] = useState('');
   const [intelligenceError, setIntelligenceError] =
     useState('');
 
-  const [search, setSearch] =
-    useState('');
-
+  const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] =
     useState('All');
 
@@ -50,6 +46,40 @@ function Issues() {
 
   const [updateError, setUpdateError] =
     useState('');
+
+  // =====================================================
+  // READ SEVERITY FROM URL
+  // Example:
+  // /issues?severity=Critical
+  // /issues?severity=High
+  // /issues?severity=Medium
+  // /issues?severity=Low
+  // =====================================================
+
+  useEffect(() => {
+    const severityFromUrl =
+      searchParams.get('severity');
+
+    const validSeverities = [
+      'Critical',
+      'High',
+      'Medium',
+      'Low'
+    ];
+
+    if (
+      severityFromUrl &&
+      validSeverities.includes(severityFromUrl)
+    ) {
+      setSeverityFilter(severityFromUrl);
+    } else {
+      setSeverityFilter('All');
+    }
+  }, [searchParams]);
+
+  // =====================================================
+  // LOAD ISSUES
+  // =====================================================
 
   async function loadIssues() {
     try {
@@ -69,6 +99,10 @@ function Issues() {
     }
   }
 
+  // =====================================================
+  // LOAD INTELLIGENCE
+  // =====================================================
+
   async function loadIntelligence() {
     try {
       setIntelligenceLoading(true);
@@ -83,6 +117,7 @@ function Issues() {
 
       setPriorityIssues(priorityData);
       setImpactIssues(impactData);
+
       setIntelligenceError('');
     } catch (err) {
       setIntelligenceError(
@@ -94,6 +129,10 @@ function Issues() {
     }
   }
 
+  // =====================================================
+  // LOAD COMPLETE PAGE
+  // =====================================================
+
   async function loadPage() {
     await Promise.all([
       loadIssues(),
@@ -104,6 +143,10 @@ function Issues() {
   useEffect(() => {
     loadPage();
   }, []);
+
+  // =====================================================
+  // UPDATE ISSUE STATUS
+  // =====================================================
 
   async function handleStatusChange(
     issueId,
@@ -127,9 +170,6 @@ function Issues() {
         )
       );
 
-      // Refresh intelligence because
-      // status contributes to both
-      // priority and impact scores.
       await loadIntelligence();
     } catch (err) {
       setUpdateError(
@@ -141,6 +181,10 @@ function Issues() {
     }
   }
 
+  // =====================================================
+  // CATEGORIES
+  // =====================================================
+
   const categories = useMemo(() => {
     return [
       'All',
@@ -150,9 +194,13 @@ function Issues() {
             (issue) => issue.category
           )
         )
-      ).sort(),
+      ).sort()
     ];
   }, [issues]);
+
+  // =====================================================
+  // INTELLIGENCE MAP
+  // =====================================================
 
   const intelligenceMap = useMemo(() => {
     const map = new Map();
@@ -162,6 +210,7 @@ function Issues() {
         map.set(priorityIssue.id, {
           priorityScore:
             priorityIssue.priorityScore,
+
           priorityBreakdown:
             priorityIssue.scoreBreakdown
         });
@@ -175,12 +224,16 @@ function Issues() {
 
         map.set(impactIssue.id, {
           ...existing,
+
           impactScore:
             impactIssue.impactScore,
+
           impactLevel:
             impactIssue.impactLevel,
+
           impactBreakdown:
             impactIssue.impactBreakdown,
+
           impactFactors:
             impactIssue.impactFactors
         });
@@ -193,6 +246,10 @@ function Issues() {
     impactIssues
   ]);
 
+  // =====================================================
+  // FILTER + SORT ISSUES
+  // =====================================================
+
   const filteredIssues = useMemo(() => {
     const searchTerm =
       search.trim().toLowerCase();
@@ -201,13 +258,13 @@ function Issues() {
       (issue) => {
         const matchesSearch =
           !searchTerm ||
-          issue.title
+          (issue.title || '')
             .toLowerCase()
             .includes(searchTerm) ||
-          issue.description
+          (issue.description || '')
             .toLowerCase()
             .includes(searchTerm) ||
-          issue.category
+          (issue.category || '')
             .toLowerCase()
             .includes(searchTerm);
 
@@ -242,27 +299,25 @@ function Issues() {
         const bIntelligence =
           intelligenceMap.get(b.id);
 
-        if (
-          sortBy === 'priority'
-        ) {
+        if (sortBy === 'priority') {
           return (
-            (bIntelligence?.priorityScore || 0) -
-            (aIntelligence?.priorityScore || 0)
+            (bIntelligence?.priorityScore ||
+              0) -
+            (aIntelligence?.priorityScore ||
+              0)
           );
         }
 
-        if (
-          sortBy === 'impact'
-        ) {
+        if (sortBy === 'impact') {
           return (
-            (bIntelligence?.impactScore || 0) -
-            (aIntelligence?.impactScore || 0)
+            (bIntelligence?.impactScore ||
+              0) -
+            (aIntelligence?.impactScore ||
+              0)
           );
         }
 
-        if (
-          sortBy === 'severity'
-        ) {
+        if (sortBy === 'severity') {
           const severityOrder = {
             Critical: 4,
             High: 3,
@@ -271,14 +326,14 @@ function Issues() {
           };
 
           return (
-            (severityOrder[b.severity] || 0) -
-            (severityOrder[a.severity] || 0)
+            (severityOrder[b.severity] ||
+              0) -
+            (severityOrder[a.severity] ||
+              0)
           );
         }
 
-        if (
-          sortBy === 'recent'
-        ) {
+        if (sortBy === 'recent') {
           return (
             new Date(b.created_at) -
             new Date(a.created_at)
@@ -298,19 +353,62 @@ function Issues() {
     intelligenceMap
   ]);
 
+  // =====================================================
+  // RESET FILTERS
+  // =====================================================
+
   function resetFilters() {
     setSearch('');
     setCategoryFilter('All');
     setSeverityFilter('All');
     setStatusFilter('All');
     setSortBy('priority');
+
+    const newParams =
+      new URLSearchParams(searchParams);
+
+    newParams.delete('severity');
+
+    setSearchParams(newParams);
   }
 
-  function getImpactClass(level) {
-    return (
-      `issue-impact-badge impact-${level.toLowerCase()}`
-    );
+  // =====================================================
+  // MANUAL SEVERITY FILTER
+  // =====================================================
+
+  function handleSeverityFilterChange(
+    newSeverity
+  ) {
+    setSeverityFilter(newSeverity);
+
+    const newParams =
+      new URLSearchParams(searchParams);
+
+    if (newSeverity === 'All') {
+      newParams.delete('severity');
+    } else {
+      newParams.set(
+        'severity',
+        newSeverity
+      );
+    }
+
+    setSearchParams(newParams);
   }
+
+  // =====================================================
+  // IMPACT CLASS
+  // =====================================================
+
+  function getImpactClass(level) {
+    return `issue-impact-badge impact-${(
+      level || 'Low'
+    ).toLowerCase()}`;
+  }
+
+  // =====================================================
+  // PRIORITY CLASS
+  // =====================================================
 
   function getPriorityClass(score) {
     if (score >= 75) {
@@ -327,6 +425,10 @@ function Issues() {
 
     return 'issue-score issue-score-low';
   }
+
+  // =====================================================
+  // SUMMARY COUNTS
+  // =====================================================
 
   const criticalCount =
     filteredIssues.filter(
@@ -369,9 +471,19 @@ function Issues() {
       );
     }).length;
 
+  // =====================================================
+  // UI
+  // =====================================================
+
   return (
     <div>
+
+      {/* =================================================
+          PAGE HEADER
+      ================================================= */}
+
       <section className="page-heading">
+
         <p className="eyebrow">
           ISSUE INTELLIGENCE REGISTRY
         </p>
@@ -385,11 +497,44 @@ function Issues() {
           manage infrastructure issues using
           UrbanPulse intelligence scores.
         </p>
+
       </section>
 
+      {/* =================================================
+          ACTIVE MAP SEVERITY FILTER
+      ================================================= */}
+
+      {severityFilter !== 'All' && (
+        <div
+          style={{
+            marginBottom: '18px',
+            padding: '12px 16px',
+            borderRadius: '10px',
+            background: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            color: '#1e40af',
+            fontSize: '14px',
+            fontWeight: '600'
+          }}
+        >
+          Showing existing issues with{' '}
+          <strong>
+            {severityFilter}
+          </strong>{' '}
+          severity.
+        </div>
+      )}
+
+      {/* =================================================
+          FILTER PANEL
+      ================================================= */}
+
       <section className="panel issue-filter-panel">
+
         <div className="panel-header">
+
           <div>
+
             <h3>
               Issue Intelligence Filters
             </h3>
@@ -399,6 +544,7 @@ function Issues() {
               how infrastructure issues are
               prioritized.
             </p>
+
           </div>
 
           <button
@@ -407,10 +553,15 @@ function Issues() {
           >
             Reset Filters
           </button>
+
         </div>
 
         <div className="issue-filters">
+
+          {/* SEARCH */}
+
           <div className="form-group search-group">
+
             <label htmlFor="issue-search">
               Search
             </label>
@@ -426,9 +577,13 @@ function Issues() {
                 )
               }
             />
+
           </div>
 
+          {/* CATEGORY */}
+
           <div className="form-group">
+
             <label htmlFor="issue-category">
               Category
             </label>
@@ -442,6 +597,7 @@ function Issues() {
                 )
               }
             >
+
               {categories.map(
                 (category) => (
                   <option
@@ -454,10 +610,15 @@ function Issues() {
                   </option>
                 )
               )}
+
             </select>
+
           </div>
 
+          {/* SEVERITY */}
+
           <div className="form-group">
+
             <label htmlFor="issue-severity">
               Severity
             </label>
@@ -466,11 +627,12 @@ function Issues() {
               id="issue-severity"
               value={severityFilter}
               onChange={(event) =>
-                setSeverityFilter(
+                handleSeverityFilterChange(
                   event.target.value
                 )
               }
             >
+
               <option value="All">
                 All Severities
               </option>
@@ -490,10 +652,15 @@ function Issues() {
               <option value="Low">
                 Low
               </option>
+
             </select>
+
           </div>
 
+          {/* STATUS */}
+
           <div className="form-group">
+
             <label htmlFor="issue-status">
               Status
             </label>
@@ -507,6 +674,7 @@ function Issues() {
                 )
               }
             >
+
               <option value="All">
                 All Statuses
               </option>
@@ -522,10 +690,15 @@ function Issues() {
               <option value="Resolved">
                 Resolved
               </option>
+
             </select>
+
           </div>
 
+          {/* SORT */}
+
           <div className="form-group">
+
             <label htmlFor="issue-sort">
               Sort By
             </label>
@@ -539,6 +712,7 @@ function Issues() {
                 )
               }
             >
+
               <option value="priority">
                 Priority Score
               </option>
@@ -554,56 +728,97 @@ function Issues() {
               <option value="recent">
                 Most Recent
               </option>
+
             </select>
+
           </div>
+
         </div>
+
       </section>
 
+      {/* =================================================
+          SUMMARY
+      ================================================= */}
+
       <section className="issue-summary-grid">
+
         <div className="issue-summary-card">
-          <span>Matching Issues</span>
+
+          <span>
+            Matching Issues
+          </span>
+
           <strong>
             {filteredIssues.length}
           </strong>
+
           <small>
             From {issues.length} total records
           </small>
+
         </div>
 
         <div className="issue-summary-card critical-summary">
-          <span>Critical</span>
+
+          <span>
+            Critical
+          </span>
+
           <strong>
             {criticalCount}
           </strong>
+
           <small>
             Critical severity
           </small>
+
         </div>
 
         <div className="issue-summary-card high-summary">
-          <span>High Priority</span>
+
+          <span>
+            High Priority
+          </span>
+
           <strong>
             {highCount}
           </strong>
+
           <small>
             High severity
           </small>
+
         </div>
 
         <div className="issue-summary-card">
-          <span>Critical Impact</span>
+
+          <span>
+            Critical Impact
+          </span>
+
           <strong>
             {criticalImpactCount}
           </strong>
+
           <small>
             Critical impact signals
           </small>
+
         </div>
+
       </section>
 
+      {/* =================================================
+          WORKFLOW
+      ================================================= */}
+
       <section className="panel">
+
         <div className="panel-header">
+
           <div>
+
             <p className="eyebrow">
               RESOLUTION WORKFLOW
             </p>
@@ -616,45 +831,75 @@ function Issues() {
               Current distribution of the
               filtered infrastructure issues.
             </p>
+
           </div>
+
         </div>
 
         <div className="issue-workflow-grid">
+
           <div className="workflow-card">
-            <span>Reported</span>
+
+            <span>
+              Reported
+            </span>
+
             <strong>
               {reportedCount}
             </strong>
+
             <small>
               New issues awaiting action
             </small>
+
           </div>
 
           <div className="workflow-card">
-            <span>In Progress</span>
+
+            <span>
+              In Progress
+            </span>
+
             <strong>
               {inProgressCount}
             </strong>
+
             <small>
               Issues being addressed
             </small>
+
           </div>
 
           <div className="workflow-card">
-            <span>Resolved</span>
+
+            <span>
+              Resolved
+            </span>
+
             <strong>
               {resolvedCount}
             </strong>
+
             <small>
               Completed infrastructure issues
             </small>
+
           </div>
+
         </div>
+
       </section>
 
+      {/* =================================================
+          INTELLIGENT ISSUE REGISTRY
+      ================================================= */}
+
       <section className="panel">
+
         <div className="panel-header">
+
           <div>
+
             <p className="eyebrow">
               INTELLIGENT ISSUE REGISTRY
             </p>
@@ -668,6 +913,7 @@ function Issues() {
               Priority Intelligence and Impact
               Intelligence.
             </p>
+
           </div>
 
           <button
@@ -683,7 +929,14 @@ function Issues() {
               ? 'Refreshing...'
               : 'Refresh Intelligence'}
           </button>
+
         </div>
+
+        {error && (
+          <div className="error-box">
+            {error}
+          </div>
+        )}
 
         {intelligenceError && (
           <div className="error-box">
@@ -710,24 +963,26 @@ function Issues() {
           !error &&
           filteredIssues.length > 0 && (
             <div className="intelligence-issue-list">
+
               {filteredIssues.map(
                 (issue, index) => {
+
                   const intelligence =
                     intelligenceMap.get(
                       issue.id
                     );
 
                   const priorityScore =
-                    intelligence?.priorityScore ??
-                    0;
+                    intelligence
+                      ?.priorityScore ?? 0;
 
                   const impactScore =
-                    intelligence?.impactScore ??
-                    0;
+                    intelligence
+                      ?.impactScore ?? 0;
 
                   const impactLevel =
-                    intelligence?.impactLevel ??
-                    'Low';
+                    intelligence
+                      ?.impactLevel ?? 'Low';
 
                   const isUpdating =
                     updatingIssueId ===
@@ -738,12 +993,15 @@ function Issues() {
                       className="intelligence-issue-card"
                       key={issue.id}
                     >
+
                       <div className="intelligence-issue-top">
+
                         <div className="issue-rank">
                           #{index + 1}
                         </div>
 
                         <div className="intelligence-issue-title">
+
                           <span className="issue-category-label">
                             {issue.category}
                           </span>
@@ -755,9 +1013,11 @@ function Issues() {
                           <p>
                             {issue.description}
                           </p>
+
                         </div>
 
                         <div className="issue-score-block">
+
                           <span>
                             Priority
                           </span>
@@ -769,9 +1029,11 @@ function Issues() {
                           >
                             {priorityScore}
                           </strong>
+
                         </div>
 
                         <div className="issue-score-block">
+
                           <span>
                             Impact
                           </span>
@@ -779,12 +1041,20 @@ function Issues() {
                           <strong className="issue-impact-score">
                             {impactScore}
                           </strong>
+
                         </div>
+
                       </div>
 
                       <div className="intelligence-issue-meta">
+
                         <span
-                          className={`badge ${issue.severity.toLowerCase()}`}
+                          className={`badge ${
+                            (
+                              issue.severity ||
+                              ''
+                            ).toLowerCase()
+                          }`}
                         >
                           {issue.severity}
                         </span>
@@ -802,38 +1072,51 @@ function Issues() {
                           {issue.latitude},{' '}
                           {issue.longitude}
                         </span>
+
                       </div>
 
                       <div className="issue-intelligence-breakdown">
+
                         <div>
+
                           <span>
                             Priority Factors
                           </span>
 
                           <small>
+
                             Severity:{' '}
                             {intelligence
                               ?.priorityBreakdown
                               ?.severity ?? 0}
+
                             {' · '}
+
                             Status:{' '}
                             {intelligence
                               ?.priorityBreakdown
                               ?.status ?? 0}
+
                             {' · '}
+
                             Category:{' '}
                             {intelligence
                               ?.priorityBreakdown
                               ?.category ?? 0}
+
                             {' · '}
+
                             Density:{' '}
                             {intelligence
                               ?.priorityBreakdown
                               ?.locationDensity ?? 0}
+
                           </small>
+
                         </div>
 
                         <div>
+
                           <span>
                             Impact Factors
                           </span>
@@ -844,11 +1127,15 @@ function Issues() {
                               ?.join(' · ') ||
                               'No additional factors'}
                           </small>
+
                         </div>
+
                       </div>
 
                       <div className="intelligence-issue-footer">
+
                         <div className="status-control">
+
                           <label
                             htmlFor={`status-${issue.id}`}
                           >
@@ -857,21 +1144,18 @@ function Issues() {
 
                           <select
                             id={`status-${issue.id}`}
-                            value={
-                              issue.status
-                            }
+                            value={issue.status}
                             disabled={
                               isUpdating
                             }
-                            onChange={(
-                              event
-                            ) =>
+                            onChange={(event) =>
                               handleStatusChange(
                                 issue.id,
                                 event.target.value
                               )
                             }
                           >
+
                             <option value="Reported">
                               Reported
                             </option>
@@ -883,22 +1167,31 @@ function Issues() {
                             <option value="Resolved">
                               Resolved
                             </option>
+
                           </select>
+
                         </div>
 
                         <span className="issue-action-hint">
+
                           {isUpdating
                             ? 'Updating intelligence...'
                             : 'Changing status recalculates intelligence scores.'}
+
                         </span>
+
                       </div>
+
                     </article>
                   );
                 }
               )}
+
             </div>
           )}
+
       </section>
+
     </div>
   );
 }
