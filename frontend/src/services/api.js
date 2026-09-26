@@ -151,3 +151,8 @@ export async function updateAlertStatus(
     }
   );
 }
+
+// Check backend and database health
+export async function checkBackendHealth() {
+  return request('/health');
+}

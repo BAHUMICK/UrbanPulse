@@ -1,1197 +1,431 @@
-import React, {
-  useEffect,
-  useMemo,
-  useState
-} from 'react';
-
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   getIssues,
   getPriorityIssues,
   getImpactIssues,
-  updateIssueStatus
+  updateIssueStatus,
 } from '../services/api';
+import { SeverityBadge, StatusBadge, ImpactBadge } from '../components/Badges';
+import {
+  IconSearch,
+  IconFilter,
+  IconRefresh,
+  IconMapPin,
+  IconAlertTriangle,
+} from '../components/Icons';
 
-import { useSearchParams } from 'react-router-dom';
-
-function Issues() {
-  const [searchParams, setSearchParams] = useSearchParams();
+function Issues({ onNavigate }) {
+  const [searchParams] = useSearchParams();
 
   const [issues, setIssues] = useState([]);
   const [priorityIssues, setPriorityIssues] = useState([]);
   const [impactIssues, setImpactIssues] = useState([]);
 
   const [loading, setLoading] = useState(true);
-  const [intelligenceLoading, setIntelligenceLoading] =
-    useState(true);
-
   const [error, setError] = useState('');
-  const [intelligenceError, setIntelligenceError] =
-    useState('');
+  const [updatingIssueId, setUpdatingIssueId] = useState(null);
+  const [updateMsg, setUpdateMsg] = useState('');
 
+  // Filters
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] =
-    useState('All');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [severityFilter, setSeverityFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [sortBy, setSortBy] = useState('priority');
 
-  const [severityFilter, setSeverityFilter] =
-    useState('All');
+  // Pagination for 1366x768 screens
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 8;
 
-  const [statusFilter, setStatusFilter] =
-    useState('All');
-
-  const [sortBy, setSortBy] =
-    useState('priority');
-
-  const [updatingIssueId, setUpdatingIssueId] =
-    useState(null);
-
-  const [updateError, setUpdateError] =
-    useState('');
-
-  // =====================================================
-  // READ SEVERITY FROM URL
-  // Example:
-  // /issues?severity=Critical
-  // /issues?severity=High
-  // /issues?severity=Medium
-  // /issues?severity=Low
-  // =====================================================
-
+  // Initialize severity filter from URL if present
   useEffect(() => {
-    const severityFromUrl =
-      searchParams.get('severity');
-
-    const validSeverities = [
-      'Critical',
-      'High',
-      'Medium',
-      'Low'
-    ];
-
-    if (
-      severityFromUrl &&
-      validSeverities.includes(severityFromUrl)
-    ) {
-      setSeverityFilter(severityFromUrl);
-    } else {
-      setSeverityFilter('All');
+    const sev = searchParams.get('severity');
+    if (sev && ['Critical', 'High', 'Medium', 'Low'].includes(sev)) {
+      setSeverityFilter(sev);
     }
   }, [searchParams]);
 
-  // =====================================================
-  // LOAD ISSUES
-  // =====================================================
-
-  async function loadIssues() {
+  async function loadAllData() {
     try {
       setLoading(true);
-
-      const data = await getIssues();
-
-      setIssues(data);
       setError('');
+      const [issuesData, priorityData, impactData] = await Promise.all([
+        getIssues().catch(() => []),
+        getPriorityIssues().catch(() => []),
+        getImpactIssues().catch(() => []),
+      ]);
+
+      setIssues(issuesData);
+      setPriorityIssues(priorityData);
+      setImpactIssues(impactData);
     } catch (err) {
-      setError(
-        err.message ||
-          'Failed to load issues'
-      );
+      console.error(err);
+      setError(err.message || 'Failed to load issues');
     } finally {
       setLoading(false);
     }
   }
 
-  // =====================================================
-  // LOAD INTELLIGENCE
-  // =====================================================
-
-  async function loadIntelligence() {
-    try {
-      setIntelligenceLoading(true);
-
-      const [
-        priorityData,
-        impactData
-      ] = await Promise.all([
-        getPriorityIssues(),
-        getImpactIssues()
-      ]);
-
-      setPriorityIssues(priorityData);
-      setImpactIssues(impactData);
-
-      setIntelligenceError('');
-    } catch (err) {
-      setIntelligenceError(
-        err.message ||
-          'Failed to load issue intelligence'
-      );
-    } finally {
-      setIntelligenceLoading(false);
-    }
-  }
-
-  // =====================================================
-  // LOAD COMPLETE PAGE
-  // =====================================================
-
-  async function loadPage() {
-    await Promise.all([
-      loadIssues(),
-      loadIntelligence()
-    ]);
-  }
-
   useEffect(() => {
-    loadPage();
+    loadAllData();
   }, []);
 
-  // =====================================================
-  // UPDATE ISSUE STATUS
-  // =====================================================
-
-  async function handleStatusChange(
-    issueId,
-    newStatus
-  ) {
+  // Update status handler
+  async function handleStatusChange(issueId, newStatus) {
     try {
       setUpdatingIssueId(issueId);
-      setUpdateError('');
+      setUpdateMsg('');
+      const result = await updateIssueStatus(issueId, newStatus);
 
-      const result =
-        await updateIssueStatus(
-          issueId,
-          newStatus
-        );
-
-      setIssues((currentIssues) =>
-        currentIssues.map((issue) =>
-          issue.id === issueId
-            ? result.data
-            : issue
-        )
+      setIssues((prev) =>
+        prev.map((item) => (item.id === issueId ? result.data || { ...item, status: newStatus } : item))
       );
-
-      await loadIntelligence();
+      setUpdateMsg(`Issue #${issueId} status changed to ${newStatus}`);
+      setTimeout(() => setUpdateMsg(''), 4000);
     } catch (err) {
-      setUpdateError(
-        err.message ||
-          'Failed to update issue status'
-      );
+      console.error(err);
+      alert(`Failed to update status: ${err.message}`);
     } finally {
       setUpdatingIssueId(null);
     }
   }
 
-  // =====================================================
-  // CATEGORIES
-  // =====================================================
-
+  // Categories list
   const categories = useMemo(() => {
     return [
       'All',
-      ...Array.from(
-        new Set(
-          issues.map(
-            (issue) => issue.category
-          )
-        )
-      ).sort()
+      ...Array.from(new Set(issues.map((i) => i.category).filter(Boolean))).sort(),
     ];
   }, [issues]);
 
-  // =====================================================
-  // INTELLIGENCE MAP
-  // =====================================================
-
-  const intelligenceMap = useMemo(() => {
+  // Intelligence lookup map (priority & impact scores)
+  const intelMap = useMemo(() => {
     const map = new Map();
-
-    priorityIssues.forEach(
-      (priorityIssue) => {
-        map.set(priorityIssue.id, {
-          priorityScore:
-            priorityIssue.priorityScore,
-
-          priorityBreakdown:
-            priorityIssue.scoreBreakdown
-        });
-      }
-    );
-
-    impactIssues.forEach(
-      (impactIssue) => {
-        const existing =
-          map.get(impactIssue.id) || {};
-
-        map.set(impactIssue.id, {
-          ...existing,
-
-          impactScore:
-            impactIssue.impactScore,
-
-          impactLevel:
-            impactIssue.impactLevel,
-
-          impactBreakdown:
-            impactIssue.impactBreakdown,
-
-          impactFactors:
-            impactIssue.impactFactors
-        });
-      }
-    );
-
+    priorityIssues.forEach((p) => {
+      map.set(p.id, { priorityScore: p.priorityScore, priorityBreakdown: p.scoreBreakdown });
+    });
+    impactIssues.forEach((im) => {
+      const existing = map.get(im.id) || {};
+      map.set(im.id, {
+        ...existing,
+        impactScore: im.impactScore,
+        impactLevel: im.impactLevel,
+      });
+    });
     return map;
-  }, [
-    priorityIssues,
-    impactIssues
-  ]);
+  }, [priorityIssues, impactIssues]);
 
-  // =====================================================
-  // FILTER + SORT ISSUES
-  // =====================================================
-
+  // Filtered & Sorted Issues
   const filteredIssues = useMemo(() => {
-    const searchTerm =
-      search.trim().toLowerCase();
+    let result = [...issues];
 
-    const filtered = issues.filter(
-      (issue) => {
-        const matchesSearch =
-          !searchTerm ||
-          (issue.title || '')
-            .toLowerCase()
-            .includes(searchTerm) ||
-          (issue.description || '')
-            .toLowerCase()
-            .includes(searchTerm) ||
-          (issue.category || '')
-            .toLowerCase()
-            .includes(searchTerm);
-
-        const matchesCategory =
-          categoryFilter === 'All' ||
-          issue.category ===
-            categoryFilter;
-
-        const matchesSeverity =
-          severityFilter === 'All' ||
-          issue.severity ===
-            severityFilter;
-
-        const matchesStatus =
-          statusFilter === 'All' ||
-          issue.status === statusFilter;
-
-        return (
-          matchesSearch &&
-          matchesCategory &&
-          matchesSeverity &&
-          matchesStatus
-        );
-      }
-    );
-
-    return [...filtered].sort(
-      (a, b) => {
-        const aIntelligence =
-          intelligenceMap.get(a.id);
-
-        const bIntelligence =
-          intelligenceMap.get(b.id);
-
-        if (sortBy === 'priority') {
-          return (
-            (bIntelligence?.priorityScore ||
-              0) -
-            (aIntelligence?.priorityScore ||
-              0)
-          );
-        }
-
-        if (sortBy === 'impact') {
-          return (
-            (bIntelligence?.impactScore ||
-              0) -
-            (aIntelligence?.impactScore ||
-              0)
-          );
-        }
-
-        if (sortBy === 'severity') {
-          const severityOrder = {
-            Critical: 4,
-            High: 3,
-            Medium: 2,
-            Low: 1
-          };
-
-          return (
-            (severityOrder[b.severity] ||
-              0) -
-            (severityOrder[a.severity] ||
-              0)
-          );
-        }
-
-        if (sortBy === 'recent') {
-          return (
-            new Date(b.created_at) -
-            new Date(a.created_at)
-          );
-        }
-
-        return 0;
-      }
-    );
-  }, [
-    issues,
-    search,
-    categoryFilter,
-    severityFilter,
-    statusFilter,
-    sortBy,
-    intelligenceMap
-  ]);
-
-  // =====================================================
-  // RESET FILTERS
-  // =====================================================
-
-  function resetFilters() {
-    setSearch('');
-    setCategoryFilter('All');
-    setSeverityFilter('All');
-    setStatusFilter('All');
-    setSortBy('priority');
-
-    const newParams =
-      new URLSearchParams(searchParams);
-
-    newParams.delete('severity');
-
-    setSearchParams(newParams);
-  }
-
-  // =====================================================
-  // MANUAL SEVERITY FILTER
-  // =====================================================
-
-  function handleSeverityFilterChange(
-    newSeverity
-  ) {
-    setSeverityFilter(newSeverity);
-
-    const newParams =
-      new URLSearchParams(searchParams);
-
-    if (newSeverity === 'All') {
-      newParams.delete('severity');
-    } else {
-      newParams.set(
-        'severity',
-        newSeverity
+    // Search query
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (i) =>
+          i.title?.toLowerCase().includes(q) ||
+          i.description?.toLowerCase().includes(q) ||
+          i.category?.toLowerCase().includes(q) ||
+          String(i.id).includes(q)
       );
     }
 
-    setSearchParams(newParams);
-  }
-
-  // =====================================================
-  // IMPACT CLASS
-  // =====================================================
-
-  function getImpactClass(level) {
-    return `issue-impact-badge impact-${(
-      level || 'Low'
-    ).toLowerCase()}`;
-  }
-
-  // =====================================================
-  // PRIORITY CLASS
-  // =====================================================
-
-  function getPriorityClass(score) {
-    if (score >= 75) {
-      return 'issue-score issue-score-critical';
+    // Category
+    if (categoryFilter !== 'All') {
+      result = result.filter((i) => i.category === categoryFilter);
     }
 
-    if (score >= 55) {
-      return 'issue-score issue-score-high';
+    // Severity
+    if (severityFilter !== 'All') {
+      result = result.filter((i) => i.severity === severityFilter);
     }
 
-    if (score >= 35) {
-      return 'issue-score issue-score-medium';
+    // Status
+    if (statusFilter !== 'All') {
+      result = result.filter((i) => i.status === statusFilter);
     }
 
-    return 'issue-score issue-score-low';
-  }
+    // Sort
+    result.sort((a, b) => {
+      const intelA = intelMap.get(a.id) || {};
+      const intelB = intelMap.get(b.id) || {};
 
-  // =====================================================
-  // SUMMARY COUNTS
-  // =====================================================
+      if (sortBy === 'priority') {
+        return (intelB.priorityScore || 0) - (intelA.priorityScore || 0);
+      }
+      if (sortBy === 'impact') {
+        return (intelB.impactScore || 0) - (intelA.impactScore || 0);
+      }
+      if (sortBy === 'newest') {
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      }
+      if (sortBy === 'severity') {
+        const order = { Critical: 4, High: 3, Medium: 2, Low: 1 };
+        return (order[b.severity] || 0) - (order[a.severity] || 0);
+      }
+      return 0;
+    });
 
-  const criticalCount =
-    filteredIssues.filter(
-      (issue) =>
-        issue.severity === 'Critical'
-    ).length;
+    return result;
+  }, [issues, search, categoryFilter, severityFilter, statusFilter, sortBy, intelMap]);
 
-  const highCount =
-    filteredIssues.filter(
-      (issue) =>
-        issue.severity === 'High'
-    ).length;
-
-  const reportedCount =
-    filteredIssues.filter(
-      (issue) =>
-        issue.status === 'Reported'
-    ).length;
-
-  const inProgressCount =
-    filteredIssues.filter(
-      (issue) =>
-        issue.status === 'In Progress'
-    ).length;
-
-  const resolvedCount =
-    filteredIssues.filter(
-      (issue) =>
-        issue.status === 'Resolved'
-    ).length;
-
-  const criticalImpactCount =
-    filteredIssues.filter((issue) => {
-      const intelligence =
-        intelligenceMap.get(issue.id);
-
-      return (
-        intelligence?.impactLevel ===
-        'Critical'
-      );
-    }).length;
-
-  // =====================================================
-  // UI
-  // =====================================================
+  // Pagination calculation
+  const totalPages = Math.ceil(filteredIssues.length / PAGE_SIZE) || 1;
+  const paginatedIssues = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredIssues.slice(start, start + PAGE_SIZE);
+  }, [filteredIssues, page]);
 
   return (
-    <div>
-
-      {/* =================================================
-          PAGE HEADER
-      ================================================= */}
-
-      <section className="page-heading">
-
-        <p className="eyebrow">
-          ISSUE INTELLIGENCE REGISTRY
-        </p>
-
-        <h2>
-          Infrastructure Issues
-        </h2>
-
-        <p>
-          Search, filter, prioritize, and
-          manage infrastructure issues using
-          UrbanPulse intelligence scores.
-        </p>
-
-      </section>
-
-      {/* =================================================
-          ACTIVE MAP SEVERITY FILTER
-      ================================================= */}
-
-      {severityFilter !== 'All' && (
-        <div
-          style={{
-            marginBottom: '18px',
-            padding: '12px 16px',
-            borderRadius: '10px',
-            background: '#eff6ff',
-            border: '1px solid #bfdbfe',
-            color: '#1e40af',
-            fontSize: '14px',
-            fontWeight: '600'
-          }}
-        >
-          Showing existing issues with{' '}
-          <strong>
-            {severityFilter}
-          </strong>{' '}
-          severity.
+    <div className="issues-page">
+      {/* UPDATE NOTIFICATION */}
+      {updateMsg && (
+        <div className="feedback-banner feedback-success" style={{ marginBottom: 12 }}>
+          {updateMsg}
         </div>
       )}
 
-      {/* =================================================
-          FILTER PANEL
-      ================================================= */}
-
-      <section className="panel issue-filter-panel">
-
-        <div className="panel-header">
-
-          <div>
-
-            <h3>
-              Issue Intelligence Filters
-            </h3>
-
-            <p>
-              Narrow the registry and choose
-              how infrastructure issues are
-              prioritized.
-            </p>
-
-          </div>
-
-          <button
-            className="secondary-button"
-            onClick={resetFilters}
-          >
-            Reset Filters
-          </button>
-
+      {error && (
+        <div className="feedback-banner feedback-error" style={{ marginBottom: 12 }}>
+          {error}
         </div>
+      )}
 
-        <div className="issue-filters">
-
-          {/* SEARCH */}
-
-          <div className="form-group search-group">
-
-            <label htmlFor="issue-search">
-              Search
-            </label>
-
+      {/* FILTER & SEARCH TOOLBAR */}
+      <div className="table-filter-bar">
+        <div className="filter-group-left">
+          <div className="search-input-wrap">
+            <IconSearch size={14} className="search-icon" />
             <input
-              id="issue-search"
               type="text"
-              placeholder="Search title, description, or category..."
+              className="search-input"
+              placeholder="Search by title, category, ID..."
               value={search}
-              onChange={(event) =>
-                setSearch(
-                  event.target.value
-                )
-              }
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
             />
-
           </div>
 
-          {/* CATEGORY */}
-
-          <div className="form-group">
-
-            <label htmlFor="issue-category">
-              Category
-            </label>
-
+          <div className="filter-selects-wrap">
             <select
-              id="issue-category"
+              className="filter-select"
               value={categoryFilter}
-              onChange={(event) =>
-                setCategoryFilter(
-                  event.target.value
-                )
-              }
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setPage(1);
+              }}
             >
-
-              {categories.map(
-                (category) => (
-                  <option
-                    key={category}
-                    value={category}
-                  >
-                    {category === 'All'
-                      ? 'All Categories'
-                      : category}
-                  </option>
-                )
-              )}
-
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat === 'All' ? 'All Categories' : cat}
+                </option>
+              ))}
             </select>
 
-          </div>
-
-          {/* SEVERITY */}
-
-          <div className="form-group">
-
-            <label htmlFor="issue-severity">
-              Severity
-            </label>
-
             <select
-              id="issue-severity"
+              className="filter-select"
               value={severityFilter}
-              onChange={(event) =>
-                handleSeverityFilterChange(
-                  event.target.value
-                )
-              }
+              onChange={(e) => {
+                setSeverityFilter(e.target.value);
+                setPage(1);
+              }}
             >
-
-              <option value="All">
-                All Severities
-              </option>
-
-              <option value="Critical">
-                Critical
-              </option>
-
-              <option value="High">
-                High
-              </option>
-
-              <option value="Medium">
-                Medium
-              </option>
-
-              <option value="Low">
-                Low
-              </option>
-
+              <option value="All">All Severities</option>
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
             </select>
 
-          </div>
-
-          {/* STATUS */}
-
-          <div className="form-group">
-
-            <label htmlFor="issue-status">
-              Status
-            </label>
-
             <select
-              id="issue-status"
+              className="filter-select"
               value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(
-                  event.target.value
-                )
-              }
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
             >
-
-              <option value="All">
-                All Statuses
-              </option>
-
-              <option value="Reported">
-                Reported
-              </option>
-
-              <option value="In Progress">
-                In Progress
-              </option>
-
-              <option value="Resolved">
-                Resolved
-              </option>
-
+              <option value="All">All Statuses</option>
+              <option value="Reported">Reported</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Resolved">Resolved</option>
             </select>
-
-          </div>
-
-          {/* SORT */}
-
-          <div className="form-group">
-
-            <label htmlFor="issue-sort">
-              Sort By
-            </label>
 
             <select
-              id="issue-sort"
+              className="filter-select"
               value={sortBy}
-              onChange={(event) =>
-                setSortBy(
-                  event.target.value
-                )
-              }
+              onChange={(e) => setSortBy(e.target.value)}
             >
-
-              <option value="priority">
-                Priority Score
-              </option>
-
-              <option value="impact">
-                Impact Score
-              </option>
-
-              <option value="severity">
-                Severity
-              </option>
-
-              <option value="recent">
-                Most Recent
-              </option>
-
+              <option value="priority">Sort: Priority Score</option>
+              <option value="impact">Sort: Impact Score</option>
+              <option value="newest">Sort: Newest First</option>
+              <option value="severity">Sort: Severity High→Low</option>
             </select>
-
           </div>
-
         </div>
 
-      </section>
-
-      {/* =================================================
-          SUMMARY
-      ================================================= */}
-
-      <section className="issue-summary-grid">
-
-        <div className="issue-summary-card">
-
-          <span>
-            Matching Issues
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+            Showing <strong>{filteredIssues.length}</strong> of {issues.length} Records
           </span>
-
-          <strong>
-            {filteredIssues.length}
-          </strong>
-
-          <small>
-            From {issues.length} total records
-          </small>
-
-        </div>
-
-        <div className="issue-summary-card critical-summary">
-
-          <span>
-            Critical
-          </span>
-
-          <strong>
-            {criticalCount}
-          </strong>
-
-          <small>
-            Critical severity
-          </small>
-
-        </div>
-
-        <div className="issue-summary-card high-summary">
-
-          <span>
-            High Priority
-          </span>
-
-          <strong>
-            {highCount}
-          </strong>
-
-          <small>
-            High severity
-          </small>
-
-        </div>
-
-        <div className="issue-summary-card">
-
-          <span>
-            Critical Impact
-          </span>
-
-          <strong>
-            {criticalImpactCount}
-          </strong>
-
-          <small>
-            Critical impact signals
-          </small>
-
-        </div>
-
-      </section>
-
-      {/* =================================================
-          WORKFLOW
-      ================================================= */}
-
-      <section className="panel">
-
-        <div className="panel-header">
-
-          <div>
-
-            <p className="eyebrow">
-              RESOLUTION WORKFLOW
-            </p>
-
-            <h3>
-              Current Issue Lifecycle
-            </h3>
-
-            <p>
-              Current distribution of the
-              filtered infrastructure issues.
-            </p>
-
-          </div>
-
-        </div>
-
-        <div className="issue-workflow-grid">
-
-          <div className="workflow-card">
-
-            <span>
-              Reported
-            </span>
-
-            <strong>
-              {reportedCount}
-            </strong>
-
-            <small>
-              New issues awaiting action
-            </small>
-
-          </div>
-
-          <div className="workflow-card">
-
-            <span>
-              In Progress
-            </span>
-
-            <strong>
-              {inProgressCount}
-            </strong>
-
-            <small>
-              Issues being addressed
-            </small>
-
-          </div>
-
-          <div className="workflow-card">
-
-            <span>
-              Resolved
-            </span>
-
-            <strong>
-              {resolvedCount}
-            </strong>
-
-            <small>
-              Completed infrastructure issues
-            </small>
-
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* =================================================
-          INTELLIGENT ISSUE REGISTRY
-      ================================================= */}
-
-      <section className="panel">
-
-        <div className="panel-header">
-
-          <div>
-
-            <p className="eyebrow">
-              INTELLIGENT ISSUE REGISTRY
-            </p>
-
-            <h3>
-              Prioritized Infrastructure Issues
-            </h3>
-
-            <p>
-              Issues are ranked using
-              Priority Intelligence and Impact
-              Intelligence.
-            </p>
-
-          </div>
-
           <button
-            className="secondary-button"
-            onClick={loadPage}
-            disabled={
-              loading ||
-              intelligenceLoading
-            }
+            type="button"
+            className="btn-ack"
+            style={{ color: '#38bdf8' }}
+            onClick={() => onNavigate && onNavigate('report')}
           >
-            {loading ||
-            intelligenceLoading
-              ? 'Refreshing...'
-              : 'Refresh Intelligence'}
+            + Ingest Issue
           </button>
+        </div>
+      </div>
 
+      {/* INCIDENT DATA TABLE */}
+      <div className="table-panel">
+        <div className="table-responsive">
+          <table className="incident-table">
+            <thead>
+              <tr>
+                <th style={{ width: '50px' }}>ID</th>
+                <th>Infrastructure Anomaly Details</th>
+                <th>Category</th>
+                <th>Severity</th>
+                <th>Priority</th>
+                <th>Impact</th>
+                <th>Coordinates</th>
+                <th>Status Management</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                    Loading incident repository...
+                  </td>
+                </tr>
+              ) : paginatedIssues.length === 0 ? (
+                <tr>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                    No infrastructure incidents matched your active filters.
+                  </td>
+                </tr>
+              ) : (
+                paginatedIssues.map((issue) => {
+                  const intel = intelMap.get(issue.id) || {};
+                  return (
+                    <tr key={issue.id}>
+                      <td style={{ fontWeight: 700, color: 'var(--text-muted)' }}>
+                        #{issue.id}
+                      </td>
+
+                      <td>
+                        <div className="td-title-bold">{issue.title}</div>
+                        <div className="td-desc-sub">{issue.description}</div>
+                      </td>
+
+                      <td>
+                        <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
+                          {issue.category}
+                        </span>
+                      </td>
+
+                      <td>
+                        <SeverityBadge severity={issue.severity} size="small" />
+                      </td>
+
+                      <td>
+                        {intel.priorityScore !== undefined ? (
+                          <span style={{ fontWeight: 800, color: '#f1f5f9', fontSize: 13 }}>
+                            {intel.priorityScore}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+
+                      <td>
+                        {intel.impactLevel ? (
+                          <ImpactBadge level={intel.impactLevel} score={intel.impactScore} size="small" />
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+
+                      <td>
+                        {issue.latitude && issue.longitude ? (
+                          <span style={{ fontSize: '11px', color: 'var(--accent-cyan)' }}>
+                            {Number(issue.latitude).toFixed(3)}, {Number(issue.longitude).toFixed(3)}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>None</span>
+                        )}
+                      </td>
+
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <select
+                            className="status-dropdown"
+                            value={issue.status}
+                            disabled={updatingIssueId === issue.id}
+                            onChange={(e) => handleStatusChange(issue.id, e.target.value)}
+                          >
+                            <option value="Reported">Reported</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Resolved">Resolved</option>
+                          </select>
+                          {updatingIssueId === issue.id && (
+                            <span style={{ fontSize: '10px', color: 'var(--accent-cyan)' }}>Saving...</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
 
-        {error && (
-          <div className="error-box">
-            {error}
-          </div>
-        )}
+        {/* PAGINATION CONTROLS */}
+        {totalPages > 1 && (
+          <div
+            style={{
+              padding: '10px 16px',
+              background: 'var(--bg-card-inner)',
+              borderTop: '1px solid var(--border-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+              Page {page} of {totalPages}
+            </span>
 
-        {intelligenceError && (
-          <div className="error-box">
-            {intelligenceError}
-          </div>
-        )}
-
-        {updateError && (
-          <div className="error-box">
-            {updateError}
-          </div>
-        )}
-
-        {!loading &&
-          !error &&
-          filteredIssues.length === 0 && (
-            <div className="loading">
-              No issues match the selected
-              filters.
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                className="btn-ack"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ← Previous
+              </button>
+              <button
+                type="button"
+                className="btn-ack"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next →
+              </button>
             </div>
-          )}
-
-        {!loading &&
-          !error &&
-          filteredIssues.length > 0 && (
-            <div className="intelligence-issue-list">
-
-              {filteredIssues.map(
-                (issue, index) => {
-
-                  const intelligence =
-                    intelligenceMap.get(
-                      issue.id
-                    );
-
-                  const priorityScore =
-                    intelligence
-                      ?.priorityScore ?? 0;
-
-                  const impactScore =
-                    intelligence
-                      ?.impactScore ?? 0;
-
-                  const impactLevel =
-                    intelligence
-                      ?.impactLevel ?? 'Low';
-
-                  const isUpdating =
-                    updatingIssueId ===
-                    issue.id;
-
-                  return (
-                    <article
-                      className="intelligence-issue-card"
-                      key={issue.id}
-                    >
-
-                      <div className="intelligence-issue-top">
-
-                        <div className="issue-rank">
-                          #{index + 1}
-                        </div>
-
-                        <div className="intelligence-issue-title">
-
-                          <span className="issue-category-label">
-                            {issue.category}
-                          </span>
-
-                          <h4>
-                            {issue.title}
-                          </h4>
-
-                          <p>
-                            {issue.description}
-                          </p>
-
-                        </div>
-
-                        <div className="issue-score-block">
-
-                          <span>
-                            Priority
-                          </span>
-
-                          <strong
-                            className={getPriorityClass(
-                              priorityScore
-                            )}
-                          >
-                            {priorityScore}
-                          </strong>
-
-                        </div>
-
-                        <div className="issue-score-block">
-
-                          <span>
-                            Impact
-                          </span>
-
-                          <strong className="issue-impact-score">
-                            {impactScore}
-                          </strong>
-
-                        </div>
-
-                      </div>
-
-                      <div className="intelligence-issue-meta">
-
-                        <span
-                          className={`badge ${
-                            (
-                              issue.severity ||
-                              ''
-                            ).toLowerCase()
-                          }`}
-                        >
-                          {issue.severity}
-                        </span>
-
-                        <span
-                          className={getImpactClass(
-                            impactLevel
-                          )}
-                        >
-                          {impactLevel} Impact
-                        </span>
-
-                        <span>
-                          Coordinates:{' '}
-                          {issue.latitude},{' '}
-                          {issue.longitude}
-                        </span>
-
-                      </div>
-
-                      <div className="issue-intelligence-breakdown">
-
-                        <div>
-
-                          <span>
-                            Priority Factors
-                          </span>
-
-                          <small>
-
-                            Severity:{' '}
-                            {intelligence
-                              ?.priorityBreakdown
-                              ?.severity ?? 0}
-
-                            {' · '}
-
-                            Status:{' '}
-                            {intelligence
-                              ?.priorityBreakdown
-                              ?.status ?? 0}
-
-                            {' · '}
-
-                            Category:{' '}
-                            {intelligence
-                              ?.priorityBreakdown
-                              ?.category ?? 0}
-
-                            {' · '}
-
-                            Density:{' '}
-                            {intelligence
-                              ?.priorityBreakdown
-                              ?.locationDensity ?? 0}
-
-                          </small>
-
-                        </div>
-
-                        <div>
-
-                          <span>
-                            Impact Factors
-                          </span>
-
-                          <small>
-                            {intelligence
-                              ?.impactFactors
-                              ?.join(' · ') ||
-                              'No additional factors'}
-                          </small>
-
-                        </div>
-
-                      </div>
-
-                      <div className="intelligence-issue-footer">
-
-                        <div className="status-control">
-
-                          <label
-                            htmlFor={`status-${issue.id}`}
-                          >
-                            Status
-                          </label>
-
-                          <select
-                            id={`status-${issue.id}`}
-                            value={issue.status}
-                            disabled={
-                              isUpdating
-                            }
-                            onChange={(event) =>
-                              handleStatusChange(
-                                issue.id,
-                                event.target.value
-                              )
-                            }
-                          >
-
-                            <option value="Reported">
-                              Reported
-                            </option>
-
-                            <option value="In Progress">
-                              In Progress
-                            </option>
-
-                            <option value="Resolved">
-                              Resolved
-                            </option>
-
-                          </select>
-
-                        </div>
-
-                        <span className="issue-action-hint">
-
-                          {isUpdating
-                            ? 'Updating intelligence...'
-                            : 'Changing status recalculates intelligence scores.'}
-
-                        </span>
-
-                      </div>
-
-                    </article>
-                  );
-                }
-              )}
-
-            </div>
-          )}
-
-      </section>
-
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,52 +1,31 @@
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  useMap,
-} from 'react-leaflet';
-
+import React, { useEffect, useMemo, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-
 import { useNavigate } from 'react-router-dom';
-
 import { getIssues } from '../services/api';
-
+import { SeverityBadge, StatusBadge } from './Badges';
+import { IconMapPin, IconFilter, IconRefresh, IconSearch } from './Icons';
 
 // =====================================================
 // LEAFLET DEFAULT MARKER FIX
 // =====================================================
-
 delete L.Icon.Default.prototype._getIconUrl;
 
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-
-  iconUrl:
-    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-
-  shadowUrl:
-    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
-
 
 // =====================================================
 // SEVERITY CONFIGURATION
 // =====================================================
-
 const SEVERITY_COLORS = {
   Critical: '#ef4444',
   High: '#f97316',
-  Medium: '#eab308',
-  Low: '#22c55e',
+  Medium: '#f59e0b',
+  Low: '#10b981',
 };
 
 const SEVERITY_PRIORITY = {
@@ -56,43 +35,16 @@ const SEVERITY_PRIORITY = {
   Low: 1,
 };
 
-
-// =====================================================
-// NORMALIZE SEVERITY
-// =====================================================
-
 function normalizeSeverity(severity) {
-  if (!severity) {
-    return 'Low';
-  }
-
-  const normalized =
-    String(severity).trim();
-
-  if (
-    normalized === 'Critical' ||
-    normalized === 'High' ||
-    normalized === 'Medium' ||
-    normalized === 'Low'
-  ) {
-    return normalized;
-  }
-
+  if (!severity) return 'Low';
+  const norm = String(severity).trim();
+  if (['Critical', 'High', 'Medium', 'Low'].includes(norm)) return norm;
   return 'Low';
 }
 
-
-// =====================================================
-// VALIDATE COORDINATES
-// =====================================================
-
-function isValidCoordinate(
-  latitude,
-  longitude
-) {
+function isValidCoordinate(latitude, longitude) {
   const lat = Number(latitude);
   const lng = Number(longitude);
-
   return (
     Number.isFinite(lat) &&
     Number.isFinite(lng) &&
@@ -103,178 +55,80 @@ function isValidCoordinate(
   );
 }
 
-
-// =====================================================
-// CREATE LOCATION MARKER
-// =====================================================
-
+// Marker icon generator with clustering count
 function createLocationMarkerIcon(group) {
   const issues = group.issues;
 
-  const highestSeverity =
-    issues.reduce(
-      (highest, issue) => {
-        const currentSeverity =
-          normalizeSeverity(
-            issue.severity
-          );
+  const highestSeverity = issues.reduce((highest, issue) => {
+    const currentSeverity = normalizeSeverity(issue.severity);
+    if (SEVERITY_PRIORITY[currentSeverity] > SEVERITY_PRIORITY[highest]) {
+      return currentSeverity;
+    }
+    return highest;
+  }, 'Low');
 
-        if (
-          SEVERITY_PRIORITY[
-            currentSeverity
-          ] >
-          SEVERITY_PRIORITY[
-            highest
-          ]
-        ) {
-          return currentSeverity;
-        }
-
-        return highest;
-      },
-      'Low'
-    );
-
-  const color =
-    SEVERITY_COLORS[
-      highestSeverity
-    ];
-
-  // ---------------------------------------------------
-  // SINGLE ISSUE MARKER
-  // ---------------------------------------------------
+  const color = SEVERITY_COLORS[highestSeverity];
 
   if (issues.length === 1) {
     return L.divIcon({
       className: 'urbanpulse-map-marker',
-
       html: `
-        <div
-          style="
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: ${color};
-            border: 3px solid white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.35);
-          "
-        ></div>
+        <div style="
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: ${color};
+          border: 2.5px solid #ffffff;
+          box-shadow: 0 0 10px ${color}88, 0 2px 6px rgba(0,0,0,0.5);
+        "></div>
       `,
-
       iconSize: [18, 18],
       iconAnchor: [9, 9],
       popupAnchor: [0, -9],
     });
   }
 
-  // ---------------------------------------------------
-  // MULTIPLE ISSUES AT SAME LOCATION
-  // ---------------------------------------------------
-
-  const severityDots = issues
-    .slice(0, 4)
-    .map((issue) => {
-      const severity =
-        normalizeSeverity(
-          issue.severity
-        );
-
-      const severityColor =
-        SEVERITY_COLORS[
-          severity
-        ];
-
-      return `
-        <span
-          style="
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: ${severityColor};
-            display: inline-block;
-            border: 1px solid white;
-            margin-left: 2px;
-          "
-        ></span>
-      `;
-    })
-    .join('');
-
   return L.divIcon({
     className: 'urbanpulse-map-marker',
-
     html: `
-      <div
-        style="
-          position: relative;
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          background: ${color};
-          border: 3px solid white;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.35);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          font-weight: 800;
-          font-size: 12px;
-        "
-      >
+      <div style="
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: ${color};
+        border: 2.5px solid #ffffff;
+        box-shadow: 0 0 12px ${color}aa, 0 3px 8px rgba(0,0,0,0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        font-weight: 800;
+        font-size: 11px;
+      ">
         ${issues.length}
-
-        <div
-          style="
-            position: absolute;
-            bottom: -7px;
-            left: 50%;
-            transform: translateX(-50%);
-            white-space: nowrap;
-          "
-        >
-          ${severityDots}
-        </div>
       </div>
     `,
-
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16],
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -15],
   });
 }
-
-
-// =====================================================
-// AUTO CENTER MAP
-// =====================================================
 
 function AutoCenter({ issues }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!issues || issues.length === 0) {
-      return;
-    }
+    if (!issues || issues.length === 0) return;
 
-    const validIssues =
-      issues.filter((issue) =>
-        isValidCoordinate(
-          issue.latitude,
-          issue.longitude
-        )
-      );
+    const validIssues = issues.filter((issue) =>
+      isValidCoordinate(issue.latitude, issue.longitude)
+    );
 
-    if (validIssues.length === 0) {
-      return;
-    }
+    if (validIssues.length === 0) return;
 
-    const bounds =
-      L.latLngBounds(
-        validIssues.map((issue) => [
-          Number(issue.latitude),
-          Number(issue.longitude),
-        ])
-      );
+    const bounds = L.latLngBounds(
+      validIssues.map((issue) => [Number(issue.latitude), Number(issue.longitude)])
+    );
 
     map.fitBounds(bounds, {
       padding: [40, 40],
@@ -285,1127 +139,319 @@ function AutoCenter({ issues }) {
   return null;
 }
 
-
-// =====================================================
-// MAP VIEW
-// =====================================================
-
-function MapView() {
+function MapView({ onNavigate }) {
   const navigate = useNavigate();
 
-  const [issues, setIssues] =
-    useState([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState('');
-
-  const [severityFilter, setSeverityFilter] =
-    useState('All');
-
-  const [categoryFilter, setCategoryFilter] =
-    useState('All');
-
-
-  // ===================================================
-  // LOAD ISSUES
-  // ===================================================
+  const [issues, setIssues] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [severityFilter, setSeverityFilter] = useState('All');
+  const [categoryFilter, setCategoryFilter] = useState('All');
 
   useEffect(() => {
-    async function loadIssues() {
+    async function loadIssuesData() {
       try {
         setLoading(true);
-
-        const data =
-          await getIssues();
-
+        const data = await getIssues();
         setIssues(data);
         setError('');
       } catch (err) {
-        setError(
-          err.message ||
-            'Failed to load issues'
-        );
+        setError(err.message || 'Failed to load map coordinates');
       } finally {
         setLoading(false);
       }
     }
-
-    loadIssues();
+    loadIssuesData();
   }, []);
 
-
-  // ===================================================
-  // OPEN EXISTING ISSUE PAGE
-  // ===================================================
-
-  function openSeverityIssues(
-    severity
-  ) {
-    navigate(
-      `/issues?severity=${encodeURIComponent(
-        severity
-      )}`
-    );
+  function openSeverityIssues(severity) {
+    if (onNavigate) {
+      onNavigate('issues');
+    } else {
+      navigate(`/issues?severity=${encodeURIComponent(severity)}`);
+    }
   }
-
-
-  // ===================================================
-  // CATEGORIES
-  // ===================================================
 
   const categories = useMemo(() => {
     return [
       'All',
-      ...Array.from(
-        new Set(
-          issues
-            .map(
-              (issue) =>
-                issue.category
-            )
-            .filter(Boolean)
-        )
-      ).sort(),
+      ...Array.from(new Set(issues.map((i) => i.category).filter(Boolean))).sort(),
     ];
   }, [issues]);
 
+  const severityCounts = useMemo(() => {
+    return {
+      Critical: issues.filter((i) => normalizeSeverity(i.severity) === 'Critical').length,
+      High: issues.filter((i) => normalizeSeverity(i.severity) === 'High').length,
+      Medium: issues.filter((i) => normalizeSeverity(i.severity) === 'Medium').length,
+      Low: issues.filter((i) => normalizeSeverity(i.severity) === 'Low').length,
+    };
+  }, [issues]);
 
-  // ===================================================
-  // FILTERED ISSUES
-  // ===================================================
+  const filteredIssues = useMemo(() => {
+    return issues.filter((issue) => {
+      const matchesSeverity =
+        severityFilter === 'All' || normalizeSeverity(issue.severity) === severityFilter;
+      const matchesCategory =
+        categoryFilter === 'All' || issue.category === categoryFilter;
+      return matchesSeverity && matchesCategory;
+    });
+  }, [issues, severityFilter, categoryFilter]);
 
-  const filteredIssues =
-    useMemo(() => {
-      return issues.filter(
-        (issue) => {
-          const matchesSeverity =
-            severityFilter === 'All' ||
-            normalizeSeverity(
-              issue.severity
-            ) === severityFilter;
+  const validMapIssues = useMemo(() => {
+    return filteredIssues.filter((i) => isValidCoordinate(i.latitude, i.longitude));
+  }, [filteredIssues]);
 
-          const matchesCategory =
-            categoryFilter === 'All' ||
-            issue.category ===
-              categoryFilter;
+  const groupedLocations = useMemo(() => {
+    const groups = new Map();
+    validMapIssues.forEach((issue) => {
+      const latitude = Number(issue.latitude);
+      const longitude = Number(issue.longitude);
+      const key = `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
 
-          return (
-            matchesSeverity &&
-            matchesCategory
-          );
-        }
-      );
-    }, [
-      issues,
-      severityFilter,
-      categoryFilter,
-    ]);
+      if (!groups.has(key)) {
+        groups.set(key, { latitude, longitude, issues: [] });
+      }
+      groups.get(key).issues.push(issue);
+    });
+    return Array.from(groups.values());
+  }, [validMapIssues]);
 
-
-  // ===================================================
-  // VALID MAP ISSUES
-  // ===================================================
-
-  const validMapIssues =
-    useMemo(() => {
-      return filteredIssues.filter(
-        (issue) =>
-          isValidCoordinate(
-            issue.latitude,
-            issue.longitude
-          )
-      );
-    }, [filteredIssues]);
-
-
-  // ===================================================
-  // GROUP ISSUES BY LOCATION
-  // ===================================================
-
-  const groupedLocations =
-    useMemo(() => {
-      const groups = new Map();
-
-      validMapIssues.forEach(
-        (issue) => {
-          const latitude =
-            Number(issue.latitude);
-
-          const longitude =
-            Number(issue.longitude);
-
-          const key =
-            `${latitude.toFixed(
-              7
-            )},${longitude.toFixed(
-              7
-            )}`;
-
-          if (!groups.has(key)) {
-            groups.set(key, {
-              latitude,
-              longitude,
-              issues: [],
-            });
-          }
-
-          groups
-            .get(key)
-            .issues.push(issue);
-        }
-      );
-
-      return Array.from(
-        groups.values()
-      );
-    }, [validMapIssues]);
-
-
-  // ===================================================
-  // SEVERITY COUNTS
-  // ===================================================
-
-  const severityCounts =
-    useMemo(() => {
-      return {
-        Critical:
-          issues.filter(
-            (issue) =>
-              normalizeSeverity(
-                issue.severity
-              ) === 'Critical'
-          ).length,
-
-        High:
-          issues.filter(
-            (issue) =>
-              normalizeSeverity(
-                issue.severity
-              ) === 'High'
-          ).length,
-
-        Medium:
-          issues.filter(
-            (issue) =>
-              normalizeSeverity(
-                issue.severity
-              ) === 'Medium'
-          ).length,
-
-        Low:
-          issues.filter(
-            (issue) =>
-              normalizeSeverity(
-                issue.severity
-              ) === 'Low'
-          ).length,
-      };
-    }, [issues]);
-
-
-  // ===================================================
-  // RESET FILTERS
-  // ===================================================
-
-  function resetFilters() {
-    setSeverityFilter('All');
-    setCategoryFilter('All');
-  }
-
-
-  // ===================================================
-  // DEFAULT MAP CENTER
-  // ===================================================
-
-  const defaultCenter = [
-    17.6868,
-    83.2185,
-  ];
-
-
-  // ===================================================
-  // RENDER
-  // ===================================================
+  // Default coordinate center (fallback: Kolkata metro coordinates from seed)
+  const defaultCenter = [22.5726, 88.3639];
 
   return (
-    <div>
+    <div className="map-view-page">
+      {/* 1. SEVERITY SUMMARY CARDS (SLEEK DARK COMMAND THEME) */}
+      <div className="map-severity-pills-row">
+        <button
+          type="button"
+          className="map-sev-btn sev-critical"
+          onClick={() => setSeverityFilter(severityFilter === 'Critical' ? 'All' : 'Critical')}
+          style={{
+            borderColor: severityFilter === 'Critical' ? 'var(--color-critical)' : undefined,
+            background: severityFilter === 'Critical' ? 'rgba(239, 68, 68, 0.15)' : undefined,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: '#fca5a5' }}>CRITICAL ANOMALIES</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: '#ef4444' }}>
+              {severityCounts.Critical}
+            </div>
+          </div>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            {severityFilter === 'Critical' ? 'Filtered ✓' : 'Filter →'}
+          </span>
+        </button>
 
-      {/* =================================================
-          PAGE HEADER
-      ================================================= */}
+        <button
+          type="button"
+          className="map-sev-btn sev-high"
+          onClick={() => setSeverityFilter(severityFilter === 'High' ? 'All' : 'High')}
+          style={{
+            borderColor: severityFilter === 'High' ? 'var(--color-high)' : undefined,
+            background: severityFilter === 'High' ? 'rgba(249, 115, 22, 0.15)' : undefined,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: '#fdba74' }}>HIGH SEVERITY</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: '#f97316' }}>
+              {severityCounts.High}
+            </div>
+          </div>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            {severityFilter === 'High' ? 'Filtered ✓' : 'Filter →'}
+          </span>
+        </button>
 
-      <section className="page-heading">
+        <button
+          type="button"
+          className="map-sev-btn sev-medium"
+          onClick={() => setSeverityFilter(severityFilter === 'Medium' ? 'All' : 'Medium')}
+          style={{
+            borderColor: severityFilter === 'Medium' ? 'var(--color-medium)' : undefined,
+            background: severityFilter === 'Medium' ? 'rgba(245, 158, 11, 0.15)' : undefined,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: '#fde68a' }}>MEDIUM SEVERITY</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: '#f59e0b' }}>
+              {severityCounts.Medium}
+            </div>
+          </div>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            {severityFilter === 'Medium' ? 'Filtered ✓' : 'Filter →'}
+          </span>
+        </button>
 
-        <p className="eyebrow">
-          CITY INFRASTRUCTURE MAP
-        </p>
+        <button
+          type="button"
+          className="map-sev-btn sev-low"
+          onClick={() => setSeverityFilter(severityFilter === 'Low' ? 'All' : 'Low')}
+          style={{
+            borderColor: severityFilter === 'Low' ? 'var(--color-low)' : undefined,
+            background: severityFilter === 'Low' ? 'rgba(16, 185, 129, 0.15)' : undefined,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: '#86efac' }}>LOW SEVERITY</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: '#10b981' }}>
+              {severityCounts.Low}
+            </div>
+          </div>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            {severityFilter === 'Low' ? 'Filtered ✓' : 'Filter →'}
+          </span>
+        </button>
+      </div>
 
-        <h2>
-          Urban Infrastructure Map
-        </h2>
+      {/* 2. MAP CONTROLS & FILTER TOOLBAR */}
+      <div className="map-toolbar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            <IconMapPin size={15} style={{ color: '#38bdf8' }} />
+            <span>
+              Plotting {validMapIssues.length} of {issues.length} Coordinate Pinpoints
+            </span>
+          </div>
 
-        <p>
-          Visualize reported infrastructure
-          issues and explore their severity,
-          location, and impact.
-        </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <label htmlFor="map-cat-select" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              Category:
+            </label>
+            <select
+              id="map-cat-select"
+              className="filter-select"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+            >
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat === 'All' ? 'All Categories' : cat}
+                </option>
+              ))}
+            </select>
+          </div>
 
-      </section>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <label htmlFor="map-sev-select" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              Severity:
+            </label>
+            <select
+              id="map-sev-select"
+              className="filter-select"
+              value={severityFilter}
+              onChange={(e) => setSeverityFilter(e.target.value)}
+            >
+              <option value="All">All Severities</option>
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+        </div>
 
-
-      {/* =================================================
-          ERROR
-      ================================================= */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {(severityFilter !== 'All' || categoryFilter !== 'All') && (
+            <button
+              type="button"
+              className="btn-ack"
+              onClick={() => {
+                setSeverityFilter('All');
+                setCategoryFilter('All');
+              }}
+            >
+              Clear Filters
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn-ack"
+            style={{ color: '#38bdf8' }}
+            onClick={() => onNavigate && onNavigate('issues')}
+          >
+            Open Incident Table →
+          </button>
+        </div>
+      </div>
 
       {error && (
-        <div className="error-box">
+        <div className="feedback-banner feedback-error" style={{ marginBottom: 10 }}>
           {error}
         </div>
       )}
 
-
-      {/* =================================================
-          SEVERITY SUMMARY
-          CLICKING OPENS EXISTING Issue.jsx PAGE
-      ================================================= */}
-
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns:
-            'repeat(4, minmax(0, 1fr))',
-          gap: '16px',
-          marginBottom: '20px',
-        }}
-      >
-
-        {/* CRITICAL */}
-
-        <button
-          type="button"
-          onClick={() =>
-            openSeverityIssues(
-              'Critical'
-            )
-          }
-          style={{
-            border: '1px solid #fecaca',
-            background: '#fef2f2',
-            borderRadius: '12px',
-            padding: '18px',
-            textAlign: 'left',
-            cursor: 'pointer',
-          }}
-        >
-
-          <div
-            style={{
-              fontSize: '13px',
-              fontWeight: '700',
-              color: '#991b1b',
-              marginBottom: '6px',
-            }}
-          >
-            CRITICAL
+      {/* 3. LEAFLET MAP CONTAINER (SIZED TO FIT 1366x768 VIEWPORT) */}
+      <div className="map-viewport-frame">
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+            Loading Geospatial Telemetry...
           </div>
-
-          <div
-            style={{
-              fontSize: '28px',
-              fontWeight: '800',
-              color: '#dc2626',
-            }}
-          >
-            {severityCounts.Critical}
-          </div>
-
-          <div
-            style={{
-              marginTop: '5px',
-              fontSize: '12px',
-              color: '#7f1d1d',
-            }}
-          >
-            View Critical Issues →
-          </div>
-
-        </button>
-
-
-        {/* HIGH */}
-
-        <button
-          type="button"
-          onClick={() =>
-            openSeverityIssues(
-              'High'
-            )
-          }
-          style={{
-            border: '1px solid #fed7aa',
-            background: '#fff7ed',
-            borderRadius: '12px',
-            padding: '18px',
-            textAlign: 'left',
-            cursor: 'pointer',
-          }}
-        >
-
-          <div
-            style={{
-              fontSize: '13px',
-              fontWeight: '700',
-              color: '#9a3412',
-              marginBottom: '6px',
-            }}
-          >
-            HIGH
-          </div>
-
-          <div
-            style={{
-              fontSize: '28px',
-              fontWeight: '800',
-              color: '#ea580c',
-            }}
-          >
-            {severityCounts.High}
-          </div>
-
-          <div
-            style={{
-              marginTop: '5px',
-              fontSize: '12px',
-              color: '#7c2d12',
-            }}
-          >
-            View High Issues →
-          </div>
-
-        </button>
-
-
-        {/* MEDIUM */}
-
-        <button
-          type="button"
-          onClick={() =>
-            openSeverityIssues(
-              'Medium'
-            )
-          }
-          style={{
-            border: '1px solid #fde68a',
-            background: '#fefce8',
-            borderRadius: '12px',
-            padding: '18px',
-            textAlign: 'left',
-            cursor: 'pointer',
-          }}
-        >
-
-          <div
-            style={{
-              fontSize: '13px',
-              fontWeight: '700',
-              color: '#854d0e',
-              marginBottom: '6px',
-            }}
-          >
-            MEDIUM
-          </div>
-
-          <div
-            style={{
-              fontSize: '28px',
-              fontWeight: '800',
-              color: '#ca8a04',
-            }}
-          >
-            {severityCounts.Medium}
-          </div>
-
-          <div
-            style={{
-              marginTop: '5px',
-              fontSize: '12px',
-              color: '#713f12',
-            }}
-          >
-            View Medium Issues →
-          </div>
-
-        </button>
-
-
-        {/* LOW */}
-
-        <button
-          type="button"
-          onClick={() =>
-            openSeverityIssues(
-              'Low'
-            )
-          }
-          style={{
-            border: '1px solid #bbf7d0',
-            background: '#f0fdf4',
-            borderRadius: '12px',
-            padding: '18px',
-            textAlign: 'left',
-            cursor: 'pointer',
-          }}
-        >
-
-          <div
-            style={{
-              fontSize: '13px',
-              fontWeight: '700',
-              color: '#166534',
-              marginBottom: '6px',
-            }}
-          >
-            LOW
-          </div>
-
-          <div
-            style={{
-              fontSize: '28px',
-              fontWeight: '800',
-              color: '#16a34a',
-            }}
-          >
-            {severityCounts.Low}
-          </div>
-
-          <div
-            style={{
-              marginTop: '5px',
-              fontSize: '12px',
-              color: '#14532d',
-            }}
-          >
-            View Low Issues →
-          </div>
-
-        </button>
-
-      </section>
-
-
-      {/* =================================================
-          FILTERS
-      ================================================= */}
-
-      <section className="panel">
-
-        <div className="panel-header">
-
-          <div>
-
-            <h3>
-              Map Filters
-            </h3>
-
-            <p>
-              Filter the infrastructure
-              issues displayed on the map.
-            </p>
-
-          </div>
-
-          <button
-            className="secondary-button"
-            onClick={resetFilters}
-          >
-            Reset Filters
-          </button>
-
-        </div>
-
-
-        <div className="issue-filters">
-
-          {/* SEVERITY */}
-
-          <div className="form-group">
-
-            <label htmlFor="map-severity">
-              Severity
-            </label>
-
-            <select
-              id="map-severity"
-              value={severityFilter}
-              onChange={(event) =>
-                setSeverityFilter(
-                  event.target.value
-                )
-              }
-            >
-
-              <option value="All">
-                All Severities
-              </option>
-
-              <option value="Critical">
-                Critical
-              </option>
-
-              <option value="High">
-                High
-              </option>
-
-              <option value="Medium">
-                Medium
-              </option>
-
-              <option value="Low">
-                Low
-              </option>
-
-            </select>
-
-          </div>
-
-
-          {/* CATEGORY */}
-
-          <div className="form-group">
-
-            <label htmlFor="map-category">
-              Category
-            </label>
-
-            <select
-              id="map-category"
-              value={categoryFilter}
-              onChange={(event) =>
-                setCategoryFilter(
-                  event.target.value
-                )
-              }
-            >
-
-              {categories.map(
-                (category) => (
-                  <option
-                    key={category}
-                    value={category}
-                  >
-                    {category === 'All'
-                      ? 'All Categories'
-                      : category}
-                  </option>
-                )
-              )}
-
-            </select>
-
-          </div>
-
-        </div>
-
-      </section>
-
-
-      {/* =================================================
-          MAP
-      ================================================= */}
-
-      <section
-        className="panel"
-        style={{
-          marginTop: '20px',
-        }}
-      >
-
-        <div className="panel-header">
-
-          <div>
-
-            <p className="eyebrow">
-              LIVE ISSUE LOCATIONS
-            </p>
-
-            <h3>
-              Infrastructure Issue Map
-            </h3>
-
-            <p>
-              {filteredIssues.length} matching
-              issue
-              {filteredIssues.length === 1
-                ? ''
-                : 's'} found.
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div
-          style={{
-            height: '600px',
-            width: '100%',
-            borderRadius: '14px',
-            overflow: 'hidden',
-          }}
-        >
-
+        ) : (
           <MapContainer
             center={defaultCenter}
             zoom={12}
             scrollWheelZoom={true}
-            style={{
-              height: '100%',
-              width: '100%',
-            }}
+            style={{ height: '100%', width: '100%' }}
           >
-
             <TileLayer
-              attribution='&copy; OpenStreetMap contributors'
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
 
+            <AutoCenter issues={validMapIssues} />
 
-            <AutoCenter
-              issues={validMapIssues}
-            />
-
-
-            {/* ==========================================
-                MARKERS
-            ========================================== */}
-
-            {groupedLocations.map(
-              (group) => (
-
-                <Marker
-                  key={`${group.latitude}-${group.longitude}`}
-                  position={[
-                    group.latitude,
-                    group.longitude,
-                  ]}
-                  icon={createLocationMarkerIcon(
-                    group
-                  )}
-                >
-
-                  <Popup>
-
-                    <div
-                      style={{
-                        minWidth: '250px',
-                      }}
-                    >
-
-                      <strong
-                        style={{
-                          display: 'block',
-                          marginBottom: '10px',
-                          fontSize: '15px',
-                        }}
-                      >
-                        {group.issues.length}{' '}
-                        Issue
-                        {group.issues.length ===
-                        1
-                          ? ''
-                          : 's'}{' '}
-                        at this location
-                      </strong>
-
-
-                      {group.issues.map(
-                        (issue) => {
-
-                          const severity =
-                            normalizeSeverity(
-                              issue.severity
-                            );
-
-                          const color =
-                            SEVERITY_COLORS[
-                              severity
-                            ];
-
-                          return (
-                            <div
-                              key={issue.id}
-                              style={{
-                                padding:
-                                  '10px 0',
-                                borderTop:
-                                  '1px solid #e5e7eb',
-                              }}
-                            >
-
-                              <div
-                                style={{
-                                  fontWeight:
-                                    '700',
-                                  marginBottom:
-                                    '4px',
-                                }}
-                              >
-                                {issue.title}
-                              </div>
-
-                              <div
-                                style={{
-                                  fontSize:
-                                    '12px',
-                                  color:
-                                    '#6b7280',
-                                  marginBottom:
-                                    '6px',
-                                }}
-                              >
-                                {issue.category}
-                              </div>
-
-                              <span
-                                style={{
-                                  display:
-                                    'inline-block',
-                                  padding:
-                                    '3px 8px',
-                                  borderRadius:
-                                    '999px',
-                                  background:
-                                    color,
-                                  color:
-                                    'white',
-                                  fontSize:
-                                    '11px',
-                                  fontWeight:
-                                    '700',
-                                }}
-                              >
-                                {severity}
-                              </span>
-
-                              <div
-                                style={{
-                                  marginTop:
-                                    '6px',
-                                  fontSize:
-                                    '12px',
-                                }}
-                              >
-                                Status:{' '}
-                                {issue.status}
-                              </div>
-
-                            </div>
-                          );
-                        }
-                      )}
-
-                    </div>
-
-                  </Popup>
-
-                </Marker>
-
-              )
-            )}
-
-          </MapContainer>
-
-        </div>
-
-
-        {/* =================================================
-            INVALID COORDINATE WARNING
-        ================================================= */}
-
-        {filteredIssues.length >
-          validMapIssues.length && (
-          <div
-            style={{
-              marginTop: '12px',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              background: '#fff7ed',
-              border:
-                '1px solid #fed7aa',
-              color: '#9a3412',
-              fontSize: '13px',
-            }}
-          >
-            Some issues could not be
-            displayed because their
-            coordinates are invalid.
-          </div>
-        )}
-
-      </section>
-
-
-      {/* =================================================
-          SEVERITY LEGEND
-      ================================================= */}
-
-      <section
-        className="panel"
-        style={{
-          marginTop: '20px',
-        }}
-      >
-
-        <div className="panel-header">
-
-          <div>
-
-            <p className="eyebrow">
-              MAP LEGEND
-            </p>
-
-            <h3>
-              Severity Levels
-            </h3>
-
-            <p>
-              Click a severity above to open
-              its existing issues in Issue.jsx.
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '18px',
-          }}
-        >
-
-          {[
-            'Critical',
-            'High',
-            'Medium',
-            'Low',
-          ].map((severity) => (
-
-            <button
-              key={severity}
-              type="button"
-              onClick={() =>
-                openSeverityIssues(
-                  severity
-                )
-              }
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                border: 'none',
-                background:
-                  'transparent',
-                cursor: 'pointer',
-                padding: '4px',
-              }}
-            >
-
-              <span
-                style={{
-                  width: '14px',
-                  height: '14px',
-                  borderRadius:
-                    '50%',
-                  background:
-                    SEVERITY_COLORS[
-                      severity
-                    ],
-                  display:
-                    'inline-block',
-                }}
-              />
-
-              <span
-                style={{
-                  fontSize: '13px',
-                  fontWeight: '600',
-                }}
+            {/* CLUSTERED PINPOINTS */}
+            {groupedLocations.map((group) => (
+              <Marker
+                key={`${group.latitude}-${group.longitude}`}
+                position={[group.latitude, group.longitude]}
+                icon={createLocationMarkerIcon(group)}
               >
-                {severity}
-              </span>
-
-            </button>
-
-          ))}
-
-        </div>
-
-      </section>
-
-
-      {/* =================================================
-          MAPPED ISSUE LIST
-      ================================================= */}
-
-      <section
-        className="panel"
-        style={{
-          marginTop: '20px',
-        }}
-      >
-
-        <div className="panel-header">
-
-          <div>
-
-            <p className="eyebrow">
-              MAPPED ISSUES
-            </p>
-
-            <h3>
-              Issues on Map
-            </h3>
-
-            <p>
-              Existing infrastructure issue
-              records currently matching the
-              map filters.
-            </p>
-
-          </div>
-
-        </div>
-
-
-        {loading ? (
-
-          <div className="loading">
-            Loading infrastructure issues...
-          </div>
-
-        ) : filteredIssues.length ===
-          0 ? (
-
-          <div className="loading">
-            No issues match the selected
-            filters.
-          </div>
-
-        ) : (
-
-          <div
-            style={{
-              display: 'grid',
-              gap: '10px',
-            }}
-          >
-
-            {filteredIssues.map(
-              (issue) => {
-
-                const severity =
-                  normalizeSeverity(
-                    issue.severity
-                  );
-
-                const color =
-                  SEVERITY_COLORS[
-                    severity
-                  ];
-
-                return (
-                  <div
-                    key={issue.id}
-                    style={{
-                      display: 'flex',
-                      justifyContent:
-                        'space-between',
-                      alignItems:
-                        'center',
-                      gap: '15px',
-                      padding:
-                        '14px 16px',
-                      border:
-                        '1px solid #e5e7eb',
-                      borderRadius:
-                        '10px',
-                    }}
-                  >
-
-                    <div>
-
-                      <div
-                        style={{
-                          fontWeight:
-                            '700',
-                          marginBottom:
-                            '4px',
-                        }}
-                      >
-                        {issue.title}
-                      </div>
-
-                      <div
-                        style={{
-                          fontSize:
-                            '12px',
-                          color:
-                            '#6b7280',
-                        }}
-                      >
-                        {issue.category}
-                        {' · '}
-                        {issue.status}
-                      </div>
-
+                <Popup>
+                  <div style={{ minWidth: 240, padding: '2px 0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <strong style={{ fontSize: '13px', color: '#f1f5f9' }}>
+                        {group.issues.length} {group.issues.length === 1 ? 'Incident' : 'Incidents'}
+                      </strong>
+                      <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+                        {group.latitude.toFixed(4)}, {group.longitude.toFixed(4)}
+                      </span>
                     </div>
 
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openSeverityIssues(
-                          severity
-                        )
-                      }
-                      style={{
-                        border: 'none',
-                        borderRadius:
-                          '999px',
-                        padding:
-                          '5px 10px',
-                        background:
-                          color,
-                        color:
-                          'white',
-                        fontWeight:
-                          '700',
-                        fontSize:
-                          '11px',
-                        cursor:
-                          'pointer',
-                      }}
-                    >
-                      {severity}
-                    </button>
-
+                    <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                      {group.issues.map((issue) => (
+                        <div
+                          key={issue.id}
+                          style={{
+                            padding: '8px 0',
+                            borderTop: '1px solid #1e2c3e',
+                          }}
+                        >
+                          <div style={{ fontWeight: 700, fontSize: '12px', color: '#ffffff', marginBottom: 3 }}>
+                            {issue.title}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+                            <SeverityBadge severity={issue.severity} size="small" />
+                            <StatusBadge status={issue.status} size="small" />
+                            <span style={{ fontSize: '10.5px', color: '#94a3b8' }}>{issue.category}</span>
+                          </div>
+                          {issue.description && (
+                            <div style={{ fontSize: '11px', color: '#94a3b8', lineHeight: 1.3 }}>
+                              {issue.description}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                );
-              }
-            )}
-
-          </div>
-
+                </Popup>
+              </Marker>
+            ))}
+          </MapContainer>
         )}
-
-      </section>
-
+      </div>
     </div>
   );
 }
