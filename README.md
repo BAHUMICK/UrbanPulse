@@ -16,9 +16,9 @@ UrbanPulse is a full-stack civic intelligence platform designed to track, analyz
 
 ## System Architecture & Tech Stack
 
-- **Frontend**: React, Vite, Tailwind CSS, Leaflet (Mapping)
-- **Backend**: Node.js, Express REST API
-- **Database**: PostgreSQL
+- **Frontend**: React 18, Vite, React-Leaflet, OpenStreetMap, Modular Command Center CSS
+- **Backend**: Node.js, Express REST API, pg (node-postgres connection pool)
+- **Database**: PostgreSQL 18.4
 - **Version Control**: Git
 
 ---
@@ -26,18 +26,68 @@ UrbanPulse is a full-stack civic intelligence platform designed to track, analyz
 ## Project Structure
 ```text
 UrbanPulse/
-├── backend/          # Node.js & Express REST API
-├── frontend/         # React + Vite + Tailwind CSS client
-├── database/         # PostgreSQL schemas and migration scripts
-├── README.md         # Project documentation & reference
+├── backend/          # Node.js & Express REST API (Port 5000)
+│   ├── src/
+│   │   ├── config/   # PostgreSQL connection pool configuration
+│   │   ├── controllers/ # Controllers for Issues, Alerts, Intelligence, Health
+│   │   ├── routes/   # Modular Express route handlers
+│   │   ├── services/ # Priority scoring, impact calculation & alert dispatch
+│   │   └── index.js  # Main Express application entry point
+│   ├── .env.example  # Environment variable template
+│   └── package.json
+├── frontend/         # React + Vite Command Center SPA (Port 5173)
+│   ├── src/
+│   │   ├── components/ # Leaflet MapView, Sidebar, Header, Badges, Icons
+│   │   ├── pages/    # Command Center Dashboard, Incident Center, Ingest, Alerts, Analytics
+│   │   ├── services/ # REST API client service layer
+│   │   ├── App.jsx   # Top-level shell and responsive navigation
+│   │   └── main.jsx
+│   ├── index.html
+│   └── package.json
+├── database/         # PostgreSQL schema definition and sample seeds
+│   └── schema.sql
+├── README.md         # Comprehensive project documentation
 └── .gitignore        # Git ignore specifications
 ```
 
 ---
 
+## REST API Reference
+- `GET  /api/health` — Service liveness and PostgreSQL connectivity status
+- `GET  /api/issues` — Retrieve all infrastructure incidents
+- `POST /api/issues` — File a new incident report & trigger automatic alert generation
+- `PUT  /api/issues/:id/status` — Update incident status (`Reported`, `In Progress`, `Resolved`) with alert sync
+- `GET  /api/alerts` — Fetch all municipal dispatch alerts
+- `GET  /api/alerts/active` — Fetch all unresolved active alerts
+- `PUT  /api/alerts/:id/status` — Update alert status (`Active`, `Acknowledged`, `Resolved`)
+- `GET  /api/intelligence/priorities` — Multi-factor priority rankings (Severity, Category, Status, Density)
+- `GET  /api/intelligence/impact` — Urban impact intelligence and bottleneck factor analysis
+
+---
+
+## Quick-Start Run Instructions
+
+### 1. Start the Backend API (Terminal 1)
+```powershell
+cd D:\UrbanPulse\backend
+npm start
+```
+*Backend runs on `http://localhost:5000`*
+
+### 2. Start the Frontend Client (Terminal 2)
+```powershell
+cd D:\UrbanPulse\frontend
+npm run dev
+```
+*Frontend runs on `http://localhost:5173`*
+
+---
+
 ## Development Roadmap
 - [x] **Stage 1**: Workspace & project structure initialization
-- [ ] **Stage 2**: PostgreSQL schema creation & database connection setup
-- [ ] **Stage 3**: Node.js REST API foundational routes (Health, Ingestion, Fetch)
-- [ ] **Stage 4**: React frontend interface & reporting forms
-- [ ] **Stage 5**: Map visualization, impact intelligence, and analytics dashboard
+- [x] **Stage 2**: PostgreSQL schema creation & database connection setup
+- [x] **Stage 3**: Node.js REST API foundational routes (Health, Ingestion, Fetch)
+- [x] **Stage 4**: React frontend interface & reporting forms
+- [x] **Stage 5**: Map visualization, impact intelligence, and analytics dashboard
+- [x] **Stage 6**: Final QA, E2E validation, and alert lifecycle synchronization
+

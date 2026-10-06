@@ -343,6 +343,33 @@ const updateIssueStatus = async (
       });
     }
 
+    // Synchronize linked municipal alerts lifecycle with issue status
+    if (status === 'Resolved') {
+      try {
+        await pool.query(
+          `UPDATE alerts SET status = 'Resolved' WHERE issue_id = $1 AND status != 'Resolved'`,
+          [issueId]
+        );
+      } catch (alertSyncErr) {
+        console.error(
+          'Error synchronizing linked alert status on issue resolution:',
+          alertSyncErr.message
+        );
+      }
+    } else if (status === 'In Progress') {
+      try {
+        await pool.query(
+          `UPDATE alerts SET status = 'Acknowledged' WHERE issue_id = $1 AND status = 'Active'`,
+          [issueId]
+        );
+      } catch (alertSyncErr) {
+        console.error(
+          'Error updating linked alert to Acknowledged on issue in-progress:',
+          alertSyncErr.message
+        );
+      }
+    }
+
     return res.status(200).json({
       success: true,
       message:

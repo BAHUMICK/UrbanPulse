@@ -49,43 +49,7 @@ INSERT INTO issues (title, category, description, latitude, longitude, severity,
     'Critical',
     'Reported'
 );
- -- Existing seed data
-INSERT INTO issues (
-    title,
-    category,
-    description,
-    latitude,
-    longitude,
-    severity,
-    status
-) VALUES
-(
-    'Deep Pothole on Main Arterial Corridor',
-    'Road Damage',
-    'Severe pothole approximately 45cm wide and 12cm deep located in the right lane near Sector 5 crossing. Creates severe accident risk for two-wheelers during rush hour.',
-    22.5802100,
-    88.4312500,
-    'High',
-    'Reported'
-),
-(
-    'Cluster of Broken Streetlights on Outer Promenade',
-    'Streetlight',
-    'Four consecutive municipal streetlights are completely dead, causing hazardous low-visibility conditions along the pedestrian walkway and cycling lane.',
-    22.5724500,
-    88.4218900,
-    'Medium',
-    'In Progress'
-),
-(
-    'Clogged Storm Drain Causing Monsoon Waterlogging',
-    'Waterlogging',
-    'Stormwater inlet blocked by debris and plastic waste, producing 30cm of stagnant standing water spanning across the central bus transit terminal.',
-    22.5691000,
-    88.4125000,
-    'Critical',
-    'Reported'
-);
+
 
 -- =========================================================
 -- URBANPULSE AUTHORITY ALERTS
