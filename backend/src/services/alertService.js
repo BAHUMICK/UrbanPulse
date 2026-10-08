@@ -40,7 +40,7 @@ const generateAlertForIssue = async (issue) => {
   let authority = 'Municipal Corporation';
 
   // -----------------------------------------------------
-  // PRIORITY SCORE
+  // PRIORITY SCORE (Preserve existing algorithm)
   // -----------------------------------------------------
 
   if (issue.severity === 'Critical') {
@@ -54,27 +54,60 @@ const generateAlertForIssue = async (issue) => {
   }
 
   // -----------------------------------------------------
-  // CATEGORY → ALERT TYPE + AUTHORITY
+  // SECTOR / CATEGORY → ALERT TYPE + AUTHORITY ROUTING
   // -----------------------------------------------------
 
-  if (issue.category === 'Waterlogging') {
-    alertType = 'Waterlogging Alert';
-    authority = 'Municipal Corporation';
-  } else if (issue.category === 'Road Safety') {
-    alertType = 'Road Safety Alert';
-    authority = 'Traffic Authority';
-  } else if (issue.category === 'Road Damage') {
+  if (issue.sector === 'Roads & Transportation') {
     alertType = 'Road Infrastructure Alert';
     authority = 'Roads Department';
-  } else if (issue.category === 'Streetlight') {
-    alertType = 'Streetlight Alert';
-    authority = 'Electrical Department';
-  } else if (issue.category === 'Garbage') {
+  } else if (issue.sector === 'Traffic & Road Safety') {
+    alertType = 'Traffic Safety Alert';
+    authority = 'Traffic Authority';
+  } else if (issue.sector === 'Water Supply & Drainage') {
+    alertType = issue.category === 'Waterlogging' ? 'Waterlogging Alert' : 'Drainage Alert';
+    authority = 'Municipal Corporation / Water & Drainage Authority';
+  } else if (issue.sector === 'Fire & Emergency Services') {
+    alertType = 'Emergency Services Alert';
+    authority = 'Fire & Emergency Services';
+  } else if (issue.sector === 'Solid Waste Management') {
     alertType = 'Waste Management Alert';
-    authority = 'Municipal Corporation';
-  } else if (issue.category === 'Drainage') {
-    alertType = 'Drainage Alert';
-    authority = 'Municipal Corporation';
+    authority = 'Waste Management Department';
+  } else if (issue.sector === 'Street Lighting') {
+    alertType = 'Streetlight Alert';
+    authority = 'Electrical / Street Lighting Department';
+  } else if (issue.sector === 'Environment & Pollution') {
+    alertType = 'Environmental Alert';
+    authority = 'Environment Department';
+  } else if (issue.sector === 'Parks & Public Spaces') {
+    alertType = 'Parks & Public Spaces Alert';
+    authority = 'Parks Department';
+  } else if (issue.sector === 'Public Health & Sanitation') {
+    alertType = 'Public Health Alert';
+    authority = 'Public Health / Sanitation Department';
+  } else if (issue.sector === 'Public Infrastructure') {
+    alertType = 'Public Infrastructure Alert';
+    authority = 'Public Infrastructure Department';
+  } else {
+    // Fallback to category-based routing if sector is Other or unspecified
+    if (issue.category === 'Waterlogging') {
+      alertType = 'Waterlogging Alert';
+      authority = 'Municipal Corporation';
+    } else if (issue.category === 'Road Safety') {
+      alertType = 'Road Safety Alert';
+      authority = 'Traffic Authority';
+    } else if (issue.category === 'Road Damage') {
+      alertType = 'Road Infrastructure Alert';
+      authority = 'Roads Department';
+    } else if (issue.category === 'Streetlight') {
+      alertType = 'Streetlight Alert';
+      authority = 'Electrical Department';
+    } else if (issue.category === 'Garbage') {
+      alertType = 'Waste Management Alert';
+      authority = 'Municipal Corporation';
+    } else if (issue.category === 'Drainage') {
+      alertType = 'Drainage Alert';
+      authority = 'Municipal Corporation';
+    }
   }
 
   // -----------------------------------------------------
@@ -84,8 +117,8 @@ const generateAlertForIssue = async (issue) => {
   const title = `${alertType}: ${issue.title}`;
 
   const message =
-    `${issue.severity} severity ${issue.category.toLowerCase()} issue reported. ` +
-    `Immediate review may be required.`;
+    `${issue.severity} severity ${issue.category.toLowerCase()} defect filed under ${issue.sector || 'civic services'}. ` +
+    `Automated dispatch assigned to ${authority}.`;
 
   // -----------------------------------------------------
   // INSERT ALERT

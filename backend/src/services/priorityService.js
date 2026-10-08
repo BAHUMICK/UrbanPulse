@@ -241,6 +241,7 @@ async function getPriorityIssues() {
   const query = `
     SELECT
       id,
+      sector,
       title,
       category,
       description,
@@ -304,6 +305,7 @@ async function getImpactIssues() {
   const query = `
     SELECT
       id,
+      sector,
       title,
       category,
       description,

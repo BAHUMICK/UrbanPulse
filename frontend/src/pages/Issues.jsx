@@ -5,14 +5,26 @@ import {
   getPriorityIssues,
   getImpactIssues,
   updateIssueStatus,
+  CIVIC_SECTORS,
 } from '../services/api';
-import { SeverityBadge, StatusBadge, ImpactBadge } from '../components/Badges';
+import {
+  SeverityBadge,
+  StatusBadge,
+  ImpactBadge,
+  SectorBadge,
+  EvidenceBadge,
+} from '../components/Badges';
 import {
   IconSearch,
   IconFilter,
   IconRefresh,
   IconMapPin,
   IconAlertTriangle,
+  IconEye,
+  IconClose,
+  IconImage,
+  IconVideo,
+  IconShield,
 } from '../components/Icons';
 
 function Issues({ onNavigate }) {
@@ -27,8 +39,12 @@ function Issues({ onNavigate }) {
   const [updatingIssueId, setUpdatingIssueId] = useState(null);
   const [updateMsg, setUpdateMsg] = useState('');
 
+  // Selected issue for details & proof lightbox modal
+  const [inspectIssue, setInspectIssue] = useState(null);
+
   // Filters
   const [search, setSearch] = useState('');
+  const [sectorFilter, setSectorFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [severityFilter, setSeverityFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -79,8 +95,18 @@ function Issues({ onNavigate }) {
       const result = await updateIssueStatus(issueId, newStatus);
 
       setIssues((prev) =>
-        prev.map((item) => (item.id === issueId ? result.data || { ...item, status: newStatus } : item))
+        prev.map((item) =>
+          item.id === issueId
+            ? result.data || { ...item, status: newStatus }
+            : item
+        )
       );
+
+      // Also update currently inspected issue if open in modal
+      if (inspectIssue && inspectIssue.id === issueId) {
+        setInspectIssue((prev) => ({ ...prev, status: newStatus }));
+      }
+
       setUpdateMsg(`Issue #${issueId} status changed to ${newStatus}`);
       setTimeout(() => setUpdateMsg(''), 4000);
     } catch (err) {
@@ -127,9 +153,15 @@ function Issues({ onNavigate }) {
         (i) =>
           i.title?.toLowerCase().includes(q) ||
           i.description?.toLowerCase().includes(q) ||
+          i.sector?.toLowerCase().includes(q) ||
           i.category?.toLowerCase().includes(q) ||
           String(i.id).includes(q)
       );
+    }
+
+    // Sector
+    if (sectorFilter !== 'All') {
+      result = result.filter((i) => i.sector === sectorFilter);
     }
 
     // Category
@@ -169,7 +201,16 @@ function Issues({ onNavigate }) {
     });
 
     return result;
-  }, [issues, search, categoryFilter, severityFilter, statusFilter, sortBy, intelMap]);
+  }, [
+    issues,
+    search,
+    sectorFilter,
+    categoryFilter,
+    severityFilter,
+    statusFilter,
+    sortBy,
+    intelMap,
+  ]);
 
   // Pagination calculation
   const totalPages = Math.ceil(filteredIssues.length / PAGE_SIZE) || 1;
@@ -201,7 +242,7 @@ function Issues({ onNavigate }) {
             <input
               type="text"
               className="search-input"
-              placeholder="Search by title, category, ID..."
+              placeholder="Search by title, sector, category, ID..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -211,6 +252,25 @@ function Issues({ onNavigate }) {
           </div>
 
           <div className="filter-selects-wrap">
+            {/* SECTOR FILTER */}
+            <select
+              className="filter-select"
+              value={sectorFilter}
+              onChange={(e) => {
+                setSectorFilter(e.target.value);
+                setPage(1);
+              }}
+              title="Filter by Municipal Service Sector"
+            >
+              <option value="All">All Civic Sectors</option>
+              {CIVIC_SECTORS.map((sec) => (
+                <option key={sec} value={sec}>
+                  {sec}
+                </option>
+              ))}
+            </select>
+
+            {/* CATEGORY FILTER */}
             <select
               className="filter-select"
               value={categoryFilter}
@@ -226,6 +286,7 @@ function Issues({ onNavigate }) {
               ))}
             </select>
 
+            {/* SEVERITY FILTER */}
             <select
               className="filter-select"
               value={severityFilter}
@@ -241,6 +302,7 @@ function Issues({ onNavigate }) {
               <option value="Low">Low</option>
             </select>
 
+            {/* STATUS FILTER */}
             <select
               className="filter-select"
               value={statusFilter}
@@ -255,6 +317,7 @@ function Issues({ onNavigate }) {
               <option value="Resolved">Resolved</option>
             </select>
 
+            {/* SORT BY */}
             <select
               className="filter-select"
               value={sortBy}
@@ -289,26 +352,27 @@ function Issues({ onNavigate }) {
           <table className="incident-table">
             <thead>
               <tr>
-                <th style={{ width: '50px' }}>ID</th>
-                <th>Infrastructure Anomaly Details</th>
+                <th style={{ width: '45px' }}>ID</th>
+                <th>Infrastructure Anomaly</th>
+                <th>Civic Sector</th>
                 <th>Category</th>
                 <th>Severity</th>
                 <th>Priority</th>
-                <th>Impact</th>
-                <th>Coordinates</th>
-                <th>Status Management</th>
+                <th>Evidence / Proof</th>
+                <th>Status</th>
+                <th style={{ textAlign: 'center', width: '80px' }}>Action</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
                     Loading incident repository...
                   </td>
                 </tr>
               ) : paginatedIssues.length === 0 ? (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
                     No infrastructure incidents matched your active filters.
                   </td>
                 </tr>
@@ -322,12 +386,22 @@ function Issues({ onNavigate }) {
                       </td>
 
                       <td>
-                        <div className="td-title-bold">{issue.title}</div>
+                        <div
+                          className="td-title-bold clickable-title"
+                          onClick={() => setInspectIssue(issue)}
+                          title="Click to inspect full details and evidence"
+                        >
+                          {issue.title}
+                        </div>
                         <div className="td-desc-sub">{issue.description}</div>
                       </td>
 
                       <td>
-                        <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
+                        <SectorBadge sector={issue.sector} size="small" />
+                      </td>
+
+                      <td>
+                        <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '11.5px' }}>
                           {issue.category}
                         </span>
                       </td>
@@ -347,21 +421,11 @@ function Issues({ onNavigate }) {
                       </td>
 
                       <td>
-                        {intel.impactLevel ? (
-                          <ImpactBadge level={intel.impactLevel} score={intel.impactScore} size="small" />
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
-                      </td>
-
-                      <td>
-                        {issue.latitude && issue.longitude ? (
-                          <span style={{ fontSize: '11px', color: 'var(--accent-cyan)' }}>
-                            {Number(issue.latitude).toFixed(3)}, {Number(issue.longitude).toFixed(3)}
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>None</span>
-                        )}
+                        <EvidenceBadge
+                          evidence={issue.evidence}
+                          size="small"
+                          onClick={() => setInspectIssue(issue)}
+                        />
                       </td>
 
                       <td>
@@ -377,9 +441,21 @@ function Issues({ onNavigate }) {
                             <option value="Resolved">Resolved</option>
                           </select>
                           {updatingIssueId === issue.id && (
-                            <span style={{ fontSize: '10px', color: 'var(--accent-cyan)' }}>Saving...</span>
+                            <span style={{ fontSize: '10px', color: 'var(--accent-cyan)' }}>...</span>
                           )}
                         </div>
+                      </td>
+
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn-table-inspect"
+                          onClick={() => setInspectIssue(issue)}
+                          title="Inspect incident and evidence proof"
+                        >
+                          <IconEye size={13} style={{ marginRight: 3, verticalAlign: -1 }} />
+                          Inspect
+                        </button>
                       </td>
                     </tr>
                   );
@@ -426,6 +502,181 @@ function Issues({ onNavigate }) {
           </div>
         )}
       </div>
+
+      {/* ===================================================== */}
+      {/* INCIDENT DETAILS & EVIDENCE LIGHTBOX MODAL */}
+      {/* ===================================================== */}
+      {inspectIssue && (
+        <div className="modal-backdrop" onClick={() => setInspectIssue(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            {/* MODAL HEADER */}
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="intel-header-badge">INCIDENT #{inspectIssue.id}</span>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: '#f1f5f9' }}>
+                  {inspectIssue.title}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setInspectIssue(null)}
+                title="Close dialog"
+              >
+                <IconClose size={16} />
+              </button>
+            </div>
+
+            {/* MODAL BODY */}
+            <div className="modal-body">
+              {/* STATUS & SECTOR STRIP */}
+              <div className="modal-badges-strip">
+                <SectorBadge sector={inspectIssue.sector} size="normal" />
+                <SeverityBadge severity={inspectIssue.severity} size="normal" />
+                <StatusBadge status={inspectIssue.status} size="normal" />
+                <span className="modal-meta-tag">
+                  Category: <strong>{inspectIssue.category}</strong>
+                </span>
+                {inspectIssue.created_at && (
+                  <span className="modal-meta-tag" style={{ marginLeft: 'auto' }}>
+                    {new Date(inspectIssue.created_at).toLocaleString([], {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </span>
+                )}
+              </div>
+
+              {/* DESCRIPTION */}
+              <div className="modal-desc-box">
+                <div className="modal-section-title">Incident Description</div>
+                <p>{inspectIssue.description}</p>
+              </div>
+
+              {/* GEOGRAPHIC COORDINATES */}
+              <div className="modal-geo-box">
+                <div>
+                  <div className="modal-section-title">
+                    <IconMapPin size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
+                    Geographic Coordinates
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--accent-cyan)', fontWeight: 600 }}>
+                    {Number(inspectIssue.latitude).toFixed(6)}, {Number(inspectIssue.longitude).toFixed(6)}
+                  </div>
+                </div>
+                {onNavigate && (
+                  <button
+                    type="button"
+                    className="btn-ack"
+                    style={{ color: '#38bdf8', fontSize: '11px' }}
+                    onClick={() => {
+                      setInspectIssue(null);
+                      onNavigate('map');
+                    }}
+                  >
+                    View on GIS Map →
+                  </button>
+                )}
+              </div>
+
+              {/* EVIDENCE / PROOF ATTACHMENTS */}
+              <div className="modal-evidence-section">
+                <div className="modal-section-title" style={{ marginBottom: 10 }}>
+                  Evidence / Proof Media
+                </div>
+
+                {!inspectIssue.evidence || inspectIssue.evidence.length === 0 ? (
+                  <div className="modal-no-evidence">
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      No evidence or proof media attached to this incident report.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="modal-evidence-grid">
+                    {inspectIssue.evidence.map((ev) => {
+                      const fullUrl = `http://localhost:5000${ev.file_path}`;
+                      const isVideo = ev.file_type === 'video';
+
+                      return (
+                        <div key={ev.id} className="modal-evidence-card">
+                          <div className="modal-evidence-media-wrap">
+                            {isVideo ? (
+                              <video
+                                src={fullUrl}
+                                controls
+                                className="modal-video-elem"
+                              />
+                            ) : (
+                              <img
+                                src={fullUrl}
+                                alt={ev.file_name}
+                                className="modal-img-elem"
+                              />
+                            )}
+                          </div>
+
+                          <div className="modal-evidence-caption">
+                            <span className="modal-ev-type">
+                              {isVideo ? (
+                                <>
+                                  <IconVideo size={12} style={{ marginRight: 3, verticalAlign: -1 }} />
+                                  Video Proof
+                                </>
+                              ) : (
+                                <>
+                                  <IconImage size={12} style={{ marginRight: 3, verticalAlign: -1 }} />
+                                  Photo Proof
+                                </>
+                              )}
+                            </span>
+                            <span className="modal-ev-name" title={ev.file_name}>
+                              {ev.file_name}
+                            </span>
+                            <a
+                              href={fullUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="modal-ev-link"
+                              title="Open original media in new tab"
+                            >
+                              Open ↗
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* MODAL FOOTER */}
+            <div className="modal-footer">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>Status:</span>
+                <select
+                  className="status-dropdown"
+                  value={inspectIssue.status}
+                  disabled={updatingIssueId === inspectIssue.id}
+                  onChange={(e) => handleStatusChange(inspectIssue.id, e.target.value)}
+                >
+                  <option value="Reported">Reported</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Resolved">Resolved</option>
+                </select>
+              </div>
+
+              <button
+                type="button"
+                className="btn-ack"
+                onClick={() => setInspectIssue(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

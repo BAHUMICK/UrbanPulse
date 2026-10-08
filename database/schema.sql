@@ -4,6 +4,7 @@
 -- Create issues table
 CREATE TABLE IF NOT EXISTS issues (
     id SERIAL PRIMARY KEY,
+    sector VARCHAR(100) NOT NULL DEFAULT 'Other Civic Services',
     title VARCHAR(255) NOT NULL,
     category VARCHAR(100) NOT NULL,
     description TEXT NOT NULL,
@@ -14,15 +15,17 @@ CREATE TABLE IF NOT EXISTS issues (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexing for fast geo-queries, category filtering, and status lookups
+-- Indexing for fast geo-queries, sector/category filtering, and status lookups
+CREATE INDEX IF NOT EXISTS idx_issues_sector ON issues(sector);
 CREATE INDEX IF NOT EXISTS idx_issues_category ON issues(category);
 CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
 CREATE INDEX IF NOT EXISTS idx_issues_severity ON issues(severity);
 CREATE INDEX IF NOT EXISTS idx_issues_coordinates ON issues(latitude, longitude);
 
 -- Sample Seed Data (3 Realistic City Infrastructure Issues)
-INSERT INTO issues (title, category, description, latitude, longitude, severity, status) VALUES
+INSERT INTO issues (sector, title, category, description, latitude, longitude, severity, status) VALUES
 (
+    'Roads & Transportation',
     'Deep Pothole on Main Arterial Corridor',
     'Road Damage',
     'Severe pothole approximately 45cm wide and 12cm deep located in the right lane near Sector 5 crossing. Creates severe accident risk for two-wheelers during rush hour.',
@@ -32,6 +35,7 @@ INSERT INTO issues (title, category, description, latitude, longitude, severity,
     'Reported'
 ),
 (
+    'Street Lighting',
     'Cluster of Broken Streetlights on Outer Promenade',
     'Streetlight',
     'Four consecutive municipal streetlights are completely dead, causing hazardous low-visibility conditions along the pedestrian walkway and cycling lane.',
@@ -41,6 +45,7 @@ INSERT INTO issues (title, category, description, latitude, longitude, severity,
     'In Progress'
 ),
 (
+    'Water Supply & Drainage',
     'Clogged Storm Drain Causing Monsoon Waterlogging',
     'Waterlogging',
     'Stormwater inlet blocked by debris and plastic waste, producing 30cm of stagnant standing water spanning across the central bus transit terminal.',
@@ -90,3 +95,25 @@ ON alerts(status);
 
 CREATE INDEX IF NOT EXISTS idx_alerts_created_at
 ON alerts(created_at);
+
+-- =========================================================
+-- URBANPULSE EVIDENCE / PROOF ATTACHMENTS
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS issue_evidence (
+    id SERIAL PRIMARY KEY,
+    issue_id INTEGER NOT NULL
+        REFERENCES issues(id)
+        ON DELETE CASCADE,
+
+    file_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    file_type VARCHAR(50) NOT NULL,
+    file_size INTEGER,
+
+    created_at TIMESTAMP WITH TIME ZONE
+        DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_issue_evidence_issue_id
+ON issue_evidence(issue_id);

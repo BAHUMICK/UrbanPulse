@@ -3,8 +3,8 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useNavigate } from 'react-router-dom';
-import { getIssues } from '../services/api';
-import { SeverityBadge, StatusBadge } from './Badges';
+import { getIssues, CIVIC_SECTORS } from '../services/api';
+import { SeverityBadge, StatusBadge, SectorBadge } from './Badges';
 import { IconMapPin, IconFilter, IconRefresh, IconSearch } from './Icons';
 
 // =====================================================
@@ -147,6 +147,7 @@ function MapView({ onNavigate }) {
   const [error, setError] = useState('');
   const [severityFilter, setSeverityFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [sectorFilter, setSectorFilter] = useState('All');
 
   useEffect(() => {
     async function loadIssuesData() {
@@ -194,9 +195,11 @@ function MapView({ onNavigate }) {
         severityFilter === 'All' || normalizeSeverity(issue.severity) === severityFilter;
       const matchesCategory =
         categoryFilter === 'All' || issue.category === categoryFilter;
-      return matchesSeverity && matchesCategory;
+      const matchesSector =
+        sectorFilter === 'All' || issue.sector === sectorFilter;
+      return matchesSeverity && matchesCategory && matchesSector;
     });
-  }, [issues, severityFilter, categoryFilter]);
+  }, [issues, severityFilter, categoryFilter, sectorFilter]);
 
   const validMapIssues = useMemo(() => {
     return filteredIssues.filter((i) => isValidCoordinate(i.latitude, i.longitude));
