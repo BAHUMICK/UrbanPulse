@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { getAlerts, updateAlertStatus } from '../services/api';
-import { SeverityBadge, StatusBadge } from '../components/Badges';
+import { SeverityBadge, StatusBadge, SectorBadge } from '../components/Badges';
 import {
   IconAlerts,
   IconShield,
@@ -260,11 +260,12 @@ function Alerts({ onAlertUpdated, onNavigate }) {
                       borderTop: '1px solid #142030',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '11px', color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: '11px', color: 'var(--text-muted)' }}>
                       <span className="alert-authority-tag">
                         <IconShield size={11} style={{ marginRight: 3, verticalAlign: -1 }} />
                         {alert.authority}
                       </span>
+                      {alert.sector && <SectorBadge sector={alert.sector} size="small" />}
                       <span>Category: <strong style={{ color: 'var(--text-secondary)' }}>{alert.category}</strong></span>
                       {alert.issue_id && (
                         <span>Linked Incident: <strong style={{ color: '#38bdf8' }}>#{alert.issue_id}</strong></span>

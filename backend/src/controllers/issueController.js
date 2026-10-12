@@ -1,8 +1,18 @@
+const fs = require('fs');
 const pool = require('../config/db');
 
 const {
   generateAlertForIssue
 } = require('../services/alertService');
+
+function cleanupUploadedFiles(files) {
+  if (!Array.isArray(files)) return;
+  for (const file of files) {
+    if (file && file.path) {
+      fs.unlink(file.path, () => {});
+    }
+  }
+}
 
 const VALID_SECTORS = [
   'Roads & Transportation',
@@ -228,6 +238,7 @@ const createIssue = async (req, res) => {
 
     // Title validation
     if (!cleanTitle) {
+      cleanupUploadedFiles(req.files);
       return res.status(400).json({
         success: false,
         message: 'Issue title is required.'
@@ -235,6 +246,7 @@ const createIssue = async (req, res) => {
     }
 
     if (cleanTitle.length < 5) {
+      cleanupUploadedFiles(req.files);
       return res.status(400).json({
         success: false,
         message: 'Issue title must contain at least 5 characters.'
@@ -242,6 +254,7 @@ const createIssue = async (req, res) => {
     }
 
     if (cleanTitle.length > 150) {
+      cleanupUploadedFiles(req.files);
       return res.status(400).json({
         success: false,
         message: 'Issue title must not exceed 150 characters.'
@@ -250,6 +263,7 @@ const createIssue = async (req, res) => {
 
     // Category validation
     if (!VALID_CATEGORIES.includes(category)) {
+      cleanupUploadedFiles(req.files);
       return res.status(400).json({
         success: false,
         message: 'Please provide a valid issue category.'
@@ -264,6 +278,7 @@ const createIssue = async (req, res) => {
 
     // Description validation
     if (!cleanDescription) {
+      cleanupUploadedFiles(req.files);
       return res.status(400).json({
         success: false,
         message: 'Issue description is required.'
@@ -271,6 +286,7 @@ const createIssue = async (req, res) => {
     }
 
     if (cleanDescription.length < 10) {
+      cleanupUploadedFiles(req.files);
       return res.status(400).json({
         success: false,
         message: 'Issue description must contain at least 10 characters.'
@@ -278,6 +294,7 @@ const createIssue = async (req, res) => {
     }
 
     if (cleanDescription.length > 2000) {
+      cleanupUploadedFiles(req.files);
       return res.status(400).json({
         success: false,
         message: 'Issue description must not exceed 2000 characters.'
@@ -286,6 +303,7 @@ const createIssue = async (req, res) => {
 
     // Latitude validation
     if (!Number.isFinite(numericLatitude)) {
+      cleanupUploadedFiles(req.files);
       return res.status(400).json({
         success: false,
         message: 'Latitude must be a valid number.'
@@ -293,6 +311,7 @@ const createIssue = async (req, res) => {
     }
 
     if (numericLatitude < -90 || numericLatitude > 90) {
+      cleanupUploadedFiles(req.files);
       return res.status(400).json({
         success: false,
         message: 'Latitude must be between -90 and 90.'
@@ -301,6 +320,7 @@ const createIssue = async (req, res) => {
 
     // Longitude validation
     if (!Number.isFinite(numericLongitude)) {
+      cleanupUploadedFiles(req.files);
       return res.status(400).json({
         success: false,
         message: 'Longitude must be a valid number.'
@@ -308,6 +328,7 @@ const createIssue = async (req, res) => {
     }
 
     if (numericLongitude < -180 || numericLongitude > 180) {
+      cleanupUploadedFiles(req.files);
       return res.status(400).json({
         success: false,
         message: 'Longitude must be between -180 and 180.'
@@ -316,6 +337,7 @@ const createIssue = async (req, res) => {
 
     // Severity validation
     if (!VALID_SEVERITIES.includes(severity)) {
+      cleanupUploadedFiles(req.files);
       return res.status(400).json({
         success: false,
         message: 'Please provide a valid severity.'

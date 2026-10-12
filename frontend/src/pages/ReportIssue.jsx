@@ -138,7 +138,7 @@ function ReportIssue({ onIssueCreated }) {
     const ext = file.name.split('.').pop()?.toLowerCase();
     const isExtAllowed = ['jpg', 'jpeg', 'png', 'webp', 'mp4', 'webm', 'mov'].includes(ext);
 
-    if (!isMimeAllowed && !isExtAllowed) {
+    if (!isMimeAllowed || !isExtAllowed) {
       setErrorMsg(
         `Unsupported file type (${file.type || ext}). Please upload a photo (JPG, PNG, WEBP) or video (MP4, WEBM, MOV).`
       );

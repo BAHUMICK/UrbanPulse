@@ -6,7 +6,7 @@ import {
   updateAlertStatus,
   getPriorityIssues,
 } from '../services/api';
-import { SeverityBadge, StatusBadge, ImpactBadge } from '../components/Badges';
+import { SeverityBadge, StatusBadge, ImpactBadge, SectorBadge } from '../components/Badges';
 import {
   IconAlertTriangle,
   IconShield,
@@ -94,6 +94,18 @@ function Dashboard({ onNavigate, onTelemetryUpdate }) {
   const topImpact = useMemo(() => {
     return impactIssues.length > 0 ? impactIssues[0] : null;
   }, [impactIssues]);
+
+  const sectorBreakdown = useMemo(() => {
+    const counts = {};
+    issues.forEach((i) => {
+      const sec = i.sector || 'Other Civic Services';
+      counts[sec] = (counts[sec] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([sector, count]) => ({ sector, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [issues]);
 
   if (loading) {
     return (
@@ -211,7 +223,7 @@ function Dashboard({ onNavigate, onTelemetryUpdate }) {
           <div className="intel-card">
             <div className="intel-card-header">
               <div className="intel-header-left">
-                <span className="intel-header-badge">AI / HEURISTIC</span>
+                <span className="intel-header-badge">RULE-BASED ENGINE</span>
                 <div>
                   <div className="intel-header-title">Priority Intelligence Leaderboard</div>
                   <div className="intel-header-sub">
@@ -242,7 +254,8 @@ function Dashboard({ onNavigate, onTelemetryUpdate }) {
 
                       <div className="priority-item-info">
                         <div className="priority-item-title">{issue.title}</div>
-                        <div className="priority-item-meta">
+                        <div className="priority-item-meta" style={{ flexWrap: 'wrap' }}>
+                          <SectorBadge sector={issue.sector} size="small" />
                           <SeverityBadge severity={issue.severity} size="small" />
                           <StatusBadge status={issue.status} size="small" />
                           <span style={{ color: 'var(--text-muted)' }}>• {issue.category}</span>
@@ -299,7 +312,8 @@ function Dashboard({ onNavigate, onTelemetryUpdate }) {
                     <div key={issue.id} className="activity-feed-item">
                       <div style={{ minWidth: 0 }}>
                         <div className="activity-title">{issue.title}</div>
-                        <div className="activity-sub">
+                        <div className="activity-sub" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                          <SectorBadge sector={issue.sector} size="small" />
                           <span>{issue.category}</span> •{' '}
                           <span>
                             {issue.latitude && issue.longitude
@@ -402,6 +416,46 @@ function Dashboard({ onNavigate, onTelemetryUpdate }) {
                           </button>
                         </div>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* CIVIC SECTOR OVERVIEW CARD */}
+          <div className="intel-card">
+            <div className="intel-card-header">
+              <div className="intel-header-left">
+                <span className="intel-header-badge">CIVIC SECTORS</span>
+                <div>
+                  <div className="intel-header-title">Municipal Sector Distribution</div>
+                  <div className="intel-header-sub">Active infrastructure load across civic wings</div>
+                </div>
+              </div>
+            </div>
+            <div className="intel-card-body">
+              {sectorBreakdown.length === 0 ? (
+                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>No civic sector data.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {sectorBreakdown.map((item) => (
+                    <div
+                      key={item.sector}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 10px',
+                        borderRadius: 6,
+                        background: 'var(--bg-card-inner)',
+                        border: '1px solid var(--border-subtle)',
+                      }}
+                    >
+                      <SectorBadge sector={item.sector} size="small" />
+                      <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {item.count} {item.count === 1 ? 'Issue' : 'Issues'}
+                      </span>
                     </div>
                   ))}
                 </div>

@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useNavigate } from 'react-router-dom';
 import { getIssues, CIVIC_SECTORS } from '../services/api';
-import { SeverityBadge, StatusBadge, SectorBadge } from './Badges';
+import { SeverityBadge, StatusBadge, SectorBadge, EvidenceBadge } from './Badges';
 import { IconMapPin, IconFilter, IconRefresh, IconSearch } from './Icons';
 
 // =====================================================
@@ -319,6 +319,25 @@ function MapView({ onNavigate }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <label htmlFor="map-sec-select" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              Sector:
+            </label>
+            <select
+              id="map-sec-select"
+              className="filter-select"
+              value={sectorFilter}
+              onChange={(e) => setSectorFilter(e.target.value)}
+            >
+              <option value="All">All Civic Sectors</option>
+              {CIVIC_SECTORS.map((sec) => (
+                <option key={sec} value={sec}>
+                  {sec}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <label htmlFor="map-cat-select" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               Category:
             </label>
@@ -356,13 +375,14 @@ function MapView({ onNavigate }) {
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>
-          {(severityFilter !== 'All' || categoryFilter !== 'All') && (
+          {(severityFilter !== 'All' || categoryFilter !== 'All' || sectorFilter !== 'All') && (
             <button
               type="button"
               className="btn-ack"
               onClick={() => {
                 setSeverityFilter('All');
                 setCategoryFilter('All');
+                setSectorFilter('All');
               }}
             >
               Clear Filters
@@ -413,7 +433,7 @@ function MapView({ onNavigate }) {
                 icon={createLocationMarkerIcon(group)}
               >
                 <Popup>
-                  <div style={{ minWidth: 240, padding: '2px 0' }}>
+                  <div style={{ minWidth: 260, padding: '2px 0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <strong style={{ fontSize: '13px', color: '#f1f5f9' }}>
                         {group.issues.length} {group.issues.length === 1 ? 'Incident' : 'Incidents'}
@@ -423,7 +443,7 @@ function MapView({ onNavigate }) {
                       </span>
                     </div>
 
-                    <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
                       {group.issues.map((issue) => (
                         <div
                           key={issue.id}
@@ -432,13 +452,19 @@ function MapView({ onNavigate }) {
                             borderTop: '1px solid #1e2c3e',
                           }}
                         >
-                          <div style={{ fontWeight: 700, fontSize: '12px', color: '#ffffff', marginBottom: 3 }}>
+                          <div style={{ fontWeight: 700, fontSize: '12px', color: '#ffffff', marginBottom: 4 }}>
                             {issue.title}
                           </div>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+                          <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+                            <SectorBadge sector={issue.sector} size="small" />
                             <SeverityBadge severity={issue.severity} size="small" />
                             <StatusBadge status={issue.status} size="small" />
-                            <span style={{ fontSize: '10.5px', color: '#94a3b8' }}>{issue.category}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+                            <span style={{ fontSize: '10.5px', color: '#94a3b8' }}>Category: {issue.category}</span>
+                            {Array.isArray(issue.evidence) && issue.evidence.length > 0 && (
+                              <EvidenceBadge evidence={issue.evidence} size="small" />
+                            )}
                           </div>
                           {issue.description && (
                             <div style={{ fontSize: '11px', color: '#94a3b8', lineHeight: 1.3 }}>

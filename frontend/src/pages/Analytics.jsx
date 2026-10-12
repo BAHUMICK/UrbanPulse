@@ -35,6 +35,21 @@ function Analytics({ onNavigate }) {
 
   const total = issues.length;
 
+  const sectorStats = useMemo(() => {
+    const counts = {};
+    issues.forEach((i) => {
+      const sec = i.sector || 'Other Civic Services';
+      counts[sec] = (counts[sec] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({
+        name,
+        count,
+        pct: total > 0 ? Math.round((count / total) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [issues, total]);
+
   const categoryStats = useMemo(() => {
     const counts = {};
     issues.forEach((i) => {
@@ -155,19 +170,44 @@ function Analytics({ onNavigate }) {
 
       {/* 2. STATISTICAL DISTRIBUTION CHARTS */}
       <div className="analytics-grid-two">
-        {/* CATEGORY DISTRIBUTION */}
+        {/* CATEGORY & SECTOR DISTRIBUTION */}
         <div className="intel-card">
           <div className="intel-card-header">
             <div className="intel-header-left">
-              <span className="intel-header-badge">CATEGORIES</span>
+              <span className="intel-header-badge">SECTORS & CATEGORIES</span>
               <div>
-                <div className="intel-header-title">Incidents by Infrastructure Domain</div>
-                <div className="intel-header-sub">Relative volume of defects reported</div>
+                <div className="intel-header-title">Incidents by Civic Sector & Domain</div>
+                <div className="intel-header-sub">Relative volume across municipal service departments</div>
               </div>
             </div>
           </div>
 
           <div className="intel-card-body">
+            <div style={{ fontWeight: 700, fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>
+              Municipal Civic Sectors
+            </div>
+            <div className="chart-bar-list" style={{ marginBottom: 20 }}>
+              {sectorStats.map((item) => (
+                <div key={item.name} className="chart-bar-item">
+                  <div className="chart-bar-label-row">
+                    <span style={{ color: 'var(--text-secondary)' }}>{item.name}</span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
+                      {item.count} <small style={{ color: 'var(--text-muted)' }}>({item.pct}%)</small>
+                    </span>
+                  </div>
+                  <div className="chart-bar-track">
+                    <div
+                      className="chart-bar-fill fill-cyan"
+                      style={{ width: `${Math.max(item.pct, 4)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ fontWeight: 700, fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>
+              Defect Categories
+            </div>
             <div className="chart-bar-list">
               {categoryStats.map((item) => (
                 <div key={item.name} className="chart-bar-item">
