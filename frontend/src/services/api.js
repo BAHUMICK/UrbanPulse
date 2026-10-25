@@ -1,4 +1,6 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+export const API_ORIGIN = API_URL.replace(/\/api$/, '');
+export const getMediaUrl = (filePath) => filePath?.startsWith('http') ? filePath : `${API_ORIGIN}${filePath || ''}`;
 
 // =====================================================
 // URBANPULSE CIVIC SERVICE SECTORS
