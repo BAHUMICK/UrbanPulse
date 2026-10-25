@@ -2101,3 +2101,306 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* =========================================================
+   17. VISUAL REFINEMENT LAYER
+   Shared surfaces and controls; page structure stays unchanged.
+   ========================================================= */
+.app-shell {
+  background: radial-gradient(ellipse at 80% -12%, rgba(31, 91, 96, 0.12), transparent 42%), var(--bg-app);
+}
+
+.app-sidebar {
+  background: linear-gradient(180deg, #0c1725 0%, var(--bg-sidebar) 100%);
+  border-right-color: #26374d;
+  box-shadow: 8px 0 24px rgba(1, 7, 15, 0.16);
+}
+
+.sidebar-brand {
+  border-bottom-color: var(--border-subtle);
+}
+
+.brand-logo-wrap {
+  background: linear-gradient(145deg, #17a99b, #117b83);
+  box-shadow: 0 4px 14px rgba(20, 169, 154, 0.2);
+}
+
+.sidebar-nav-item {
+  border: 1px solid transparent;
+}
+
+.sidebar-nav-item:hover {
+  background: rgba(148, 177, 198, 0.08);
+  border-color: rgba(148, 177, 198, 0.1);
+}
+
+.sidebar-nav-item.active {
+  background: linear-gradient(90deg, rgba(45, 212, 191, 0.14), rgba(45, 212, 191, 0.045));
+  color: var(--accent-cyan);
+  border-color: rgba(45, 212, 191, 0.14);
+  border-left: 3px solid var(--accent-cyan);
+}
+
+.sidebar-nav-item.active .nav-item-icon {
+  color: var(--accent-cyan);
+}
+
+.nav-item-sub,
+.sidebar-project-tag {
+  color: var(--text-muted);
+}
+
+.app-header {
+  background: rgba(16, 27, 42, 0.96);
+  border-bottom-color: var(--border-card);
+}
+
+.header-sector-tag,
+.header-refresh-btn,
+.intel-header-badge,
+.pipeline-step-num {
+  color: var(--accent-cyan);
+}
+
+.header-clock-pill,
+.header-alert-btn {
+  background: var(--bg-card-inner);
+  border-color: var(--border-card);
+}
+
+.header-refresh-btn {
+  background: rgba(20, 169, 154, 0.12);
+  border-color: rgba(45, 212, 191, 0.25);
+}
+
+.header-refresh-btn:hover {
+  background: rgba(20, 169, 154, 0.2);
+  border-color: rgba(45, 212, 191, 0.42);
+}
+
+.app-content-body {
+  background: transparent;
+  scrollbar-gutter: stable;
+}
+
+.kpi-card,
+.intel-card,
+.table-filter-bar,
+.table-panel,
+.map-toolbar,
+.map-viewport-frame,
+.impact-panel,
+.priority-panel,
+.pipeline-step-card {
+  border-color: var(--border-card);
+  box-shadow: 0 5px 16px rgba(1, 7, 15, 0.12);
+}
+
+.kpi-card,
+.intel-card,
+.table-filter-bar,
+.table-panel,
+.map-toolbar,
+.map-viewport-frame,
+.impact-panel,
+.priority-panel {
+  border-radius: 9px;
+}
+
+.kpi-card {
+  background: linear-gradient(160deg, rgba(22, 36, 54, 0.98), var(--bg-card));
+}
+
+.kpi-card:hover,
+.priority-leader-item:hover,
+.activity-feed-item:hover,
+.alert-feed-item:hover {
+  box-shadow: 0 7px 18px rgba(1, 7, 15, 0.2);
+}
+
+.kpi-card-label,
+.incident-table th,
+.telemetry-title,
+.sidebar-section-title {
+  color: var(--text-muted);
+}
+
+.intel-card-header,
+.incident-table th {
+  background: #101b2a;
+}
+
+.priority-leader-item,
+.activity-feed-item,
+.alert-feed-item,
+.telemetry-card,
+.factor-tag,
+.preset-chip {
+  background-color: var(--bg-card-inner);
+  border-color: var(--border-subtle);
+}
+
+.priority-rank-badge,
+.alert-authority-tag,
+.preset-chip {
+  color: var(--accent-cyan);
+}
+
+.priority-rank-badge,
+.alert-authority-tag {
+  background: rgba(45, 212, 191, 0.11);
+}
+
+.alert-feed-item {
+  border-left-color: var(--color-critical);
+}
+
+.alert-feed-item:hover {
+  border-left-color: var(--color-critical);
+}
+
+.table-filter-bar,
+.map-toolbar {
+  background: rgba(18, 30, 46, 0.88);
+}
+
+.search-input,
+.filter-select,
+.status-dropdown,
+.form-input-custom,
+.form-select-custom,
+.form-textarea-custom {
+  background-color: var(--bg-input);
+  border-color: #2b3d53;
+}
+
+.search-input::placeholder,
+.form-input-custom::placeholder,
+.form-textarea-custom::placeholder {
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+.incident-table th {
+  color: #a0afc1;
+  border-bottom-color: var(--border-card);
+}
+
+.incident-table td {
+  border-bottom-color: rgba(42, 60, 81, 0.72);
+}
+
+.incident-table tbody tr:nth-child(even) {
+  background: rgba(14, 24, 38, 0.38);
+}
+
+.incident-table tbody tr:hover {
+  background: rgba(45, 212, 191, 0.06);
+}
+
+.form-label {
+  color: #b7c4d3;
+}
+
+.form-submit-btn {
+  background: linear-gradient(135deg, #159f93, #117e7b);
+  border-color: #28b9aa;
+  box-shadow: 0 3px 10px rgba(17, 126, 123, 0.22);
+}
+
+.form-submit-btn:hover {
+  filter: brightness(1.08);
+}
+
+.preset-chip {
+  background: rgba(45, 212, 191, 0.07);
+}
+
+.preset-chip:hover,
+.evidence-dropzone:hover {
+  border-color: var(--accent-cyan);
+  background: rgba(45, 212, 191, 0.09);
+}
+
+.dropzone-icon-wrap {
+  background: rgba(45, 212, 191, 0.12);
+  color: var(--accent-cyan);
+}
+
+.map-viewport-frame {
+  box-shadow: 0 8px 22px rgba(1, 7, 15, 0.2);
+}
+
+.chart-bar-track {
+  background: #0a1421;
+}
+
+.fill-cyan {
+  background: linear-gradient(90deg, #138e87, #55c9c1);
+}
+
+.pipeline-step-card {
+  background: linear-gradient(160deg, #142236, var(--bg-card));
+}
+
+.btn-ack,
+.btn-resolve,
+.btn-table-inspect,
+.header-alert-btn,
+.header-refresh-btn,
+.map-sev-btn,
+.status-dropdown,
+.filter-select,
+.search-input,
+.form-input-custom,
+.form-select-custom,
+.form-textarea-custom {
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+:is(.search-input, .filter-select, .status-dropdown, .form-input-custom, .form-select-custom, .form-textarea-custom):focus-visible {
+  border-color: var(--border-focus);
+  outline: 2px solid rgba(45, 212, 191, 0.28);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.1);
+}
+
+button:disabled {
+  filter: saturate(0.55);
+}
+
+@media (max-width: 520px) {
+  .app-header {
+    padding-right: 10px;
+    padding-left: 10px;
+    gap: 8px;
+  }
+
+  .header-title {
+    font-size: 13px;
+    max-width: 42vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-sector-tag {
+    font-size: 9px;
+  }
+
+  .header-right {
+    gap: 5px;
+  }
+
+  .header-clock-pill {
+    display: none;
+  }
+
+  .app-content-body {
+    padding: 12px 12px 20px;
+  }
+
+  .kpi-grid {
+    gap: 8px;
+  }
+}

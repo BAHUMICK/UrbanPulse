@@ -9,7 +9,7 @@ import {
 const PAGE_META = {
   dashboard: {
     title: 'Urban Infrastructure Command Center',
-    subtitle: 'Real-time municipal anomaly triage, priority intelligence & alerts',
+    subtitle: 'Rule-based issue triage, priority intelligence & in-app alerts',
     sector: 'Metro Operations • Sector 5',
   },
   map: {
@@ -28,7 +28,7 @@ const PAGE_META = {
     sector: 'Field Ingestion Intake',
   },
   alerts: {
-    title: 'Municipal Alert Dispatch Engine',
+    title: 'Municipal Alert Center',
     subtitle: 'Automated civic intelligence alerts assigned directly to relevant municipal bodies',
     sector: 'Automated Alert Feed',
   },

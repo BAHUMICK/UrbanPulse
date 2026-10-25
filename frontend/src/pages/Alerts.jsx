@@ -9,6 +9,9 @@ import {
   IconAlertTriangle,
 } from '../components/Icons';
 
+const displayAlertMessage = (message = '') =>
+  message.replace(/Automated dispatch assigned to/gi, 'In-app alert assigned to');
+
 function Alerts({ onAlertUpdated, onNavigate }) {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +76,7 @@ function Alerts({ onAlertUpdated, onNavigate }) {
         <div className="pipeline-step-card">
           <span className="pipeline-step-num">STAGE 01</span>
           <span className="pipeline-step-title">Anomaly Ingestion</span>
-          <span className="pipeline-step-desc">Citizens / IoT telemetry reports filed</span>
+          <span className="pipeline-step-desc">Issue submitted through the report form</span>
         </div>
         <div className="pipeline-step-card">
           <span className="pipeline-step-num">STAGE 02</span>
@@ -82,13 +85,13 @@ function Alerts({ onAlertUpdated, onNavigate }) {
         </div>
         <div className="pipeline-step-card">
           <span className="pipeline-step-num">STAGE 03</span>
-          <span className="pipeline-step-title">Automated Dispatch</span>
-          <span className="pipeline-step-desc">Alert generated when score &gt; threshold</span>
+          <span className="pipeline-step-title">Alert Eligibility</span>
+          <span className="pipeline-step-desc">In-app alert created by score or severity rule</span>
         </div>
         <div className="pipeline-step-card">
           <span className="pipeline-step-num">STAGE 04</span>
           <span className="pipeline-step-title">Authority Routing</span>
-          <span className="pipeline-step-desc">Dispatched to PWD, Traffic, or Municipal Corp</span>
+          <span className="pipeline-step-desc">Assigned a sector authority label</span>
         </div>
       </div>
 
@@ -177,7 +180,7 @@ function Alerts({ onAlertUpdated, onNavigate }) {
                 borderColor: 'rgba(244, 63, 94, 0.25)',
               }}
             >
-              DISPATCH REPOSITORY
+              IN-APP ALERT REPOSITORY
             </span>
             <div>
               <div className="intel-header-title">Municipal Alert Feed</div>
@@ -228,7 +231,7 @@ function Alerts({ onAlertUpdated, onNavigate }) {
                         {alert.title}
                       </div>
                       <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: 1.3 }}>
-                        {alert.message}
+                        {displayAlertMessage(alert.message)}
                       </div>
                     </div>
 

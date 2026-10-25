@@ -6,6 +6,7 @@ import {
   getImpactIssues,
   updateIssueStatus,
   CIVIC_SECTORS,
+  getMediaUrl,
 } from '../services/api';
 import {
   SeverityBadge,
@@ -594,7 +595,7 @@ function Issues({ onNavigate }) {
                 ) : (
                   <div className="modal-evidence-grid">
                     {inspectIssue.evidence.map((ev) => {
-                      const fullUrl = `http://localhost:5000${ev.file_path}`;
+                      const fullUrl = getMediaUrl(ev.file_path);
                       const isVideo = ev.file_type === 'video';
 
                       return (

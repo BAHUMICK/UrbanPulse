@@ -41,13 +41,13 @@ function Sidebar({
     {
       id: 'report',
       label: 'Report Anomaly',
-      sublabel: 'Citizen / Sensor Ingestion',
+      sublabel: 'Issue Report Intake',
       icon: <IconReport size={18} />,
     },
     {
       id: 'alerts',
       label: 'Municipal Alerts',
-      sublabel: 'Auto Dispatch Engine',
+      sublabel: 'In-App Alert Lifecycle',
       icon: <IconAlerts size={18} />,
       badge: activeAlertCount > 0 ? activeAlertCount : null,
       badgeType: 'critical',

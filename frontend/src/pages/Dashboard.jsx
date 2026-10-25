@@ -347,7 +347,7 @@ function Dashboard({ onNavigate, onTelemetryUpdate }) {
                     borderColor: 'rgba(244, 63, 94, 0.25)',
                   }}
                 >
-                  DISPATCH
+                  IN-APP ALERTS
                 </span>
                 <div>
                   <div className="intel-header-title">Active Municipal Alerts</div>

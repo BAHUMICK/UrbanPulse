@@ -306,7 +306,7 @@ function ReportIssue({ onIssueCreated }) {
                     ))}
                   </select>
                   <small style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: 4, display: 'block' }}>
-                    Defines the high-level municipal responsibility area for authority dispatch.
+                    Used to assign an authority label to eligible in-app alerts.
                   </small>
                 </div>
 
@@ -575,10 +575,10 @@ function ReportIssue({ onIssueCreated }) {
                   </div>
                   <ul style={{ paddingLeft: 18, margin: 0 }}>
                     <li>
-                      Selected <strong>Sector</strong> determines municipal department dispatch.
+                      Selected <strong>Sector</strong> determines the authority label on eligible in-app alerts.
                     </li>
                     <li>
-                      Evidence media is securely stored and available on the incident triage desk.
+                      Evidence files are stored in the configured upload directory and linked to this issue.
                     </li>
                     <li>
                       Priority scores are computed automatically based on severity, density, and category.
