@@ -13,15 +13,23 @@ const getHealth = async (req, res) => {
       databaseTime: dbResult.rows[0].current_time,
       timestamp: new Date().toISOString()
     });
-  } catch (err) {
-    console.error('Database connection error in /api/health:', err.message);
-    return res.status(503).json({
-      status: 'DOWN',
-      message: 'Backend server is running, but database connection failed',
-      error: err.message,
-      timestamp: new Date().toISOString()
-    });
-  }
+
+} catch (err) {
+  console.error('Database connection error in /api/health:', {
+    name: err.name,
+    code: err.code,
+    message: err.message,
+    detail: err.detail,
+    severity: err.severity
+  });
+
+  return res.status(503).json({
+    status: 'DOWN',
+    message: 'Backend server is running, but database connection failed',
+    timestamp: new Date().toISOString()
+  });
+}
+
 };
 
 module.exports = { getHealth };
