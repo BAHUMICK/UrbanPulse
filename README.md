@@ -1,7 +1,7 @@
 # UrbanPulse — City Infrastructure Anomaly & Impact Intelligence Platform
 
 > **Final-Year Software Engineering Project**  
-> A full-stack civic infrastructure telemetry, rule-based priority/impact intelligence, evidence verification, and automated municipal alert dispatch platform.
+> A full-stack civic infrastructure issue reporting, rule-based priority/impact intelligence, evidence handling, and in-app alert workflow.
 
 ---
 
@@ -44,7 +44,7 @@
 **Project Name:** UrbanPulse  
 **Formal Title:** *UrbanPulse — City Infrastructure Anomaly & Impact Intelligence Platform*
 
-**UrbanPulse** is a full-stack web application designed to help citizens report urban infrastructure anomalies—such as road damage, traffic hazards, waterlogging, drainage blockages, street lighting failures, and waste accumulation—while equipping municipal corporations with **rule-based priority scoring**, **urban impact intelligence**, **geospatial hotspot mapping**, **photo/video field evidence verification**, and **automated authority alert dispatch**.
+**UrbanPulse** is a full-stack web application designed to help citizens report urban infrastructure issues—such as road damage, traffic hazards, waterlogging, drainage blockages, street lighting failures, and waste accumulation—while giving municipal staff a demonstration interface for **rule-based priority scoring**, **urban impact analysis**, **geospatial issue mapping**, **photo/video evidence handling**, and **in-app alerts routed to authority labels**. The current code does not send external notifications or connect to live city sensors.
 
 Unlike simple complaint boxes that store reports chronologically, UrbanPulse evaluates every incoming report across multiple weighted dimensions (severity, defect category, workflow status, and spatial cluster density) to ensure the most disruptive civic hazards rise to the top of the municipal response queue.
 
@@ -57,7 +57,7 @@ Modern cities face thousands of daily civic infrastructure failures—potholes o
 1. **Lack of Objective Prioritization:** Complaints are processed in First-In-First-Out (FIFO) order rather than by public safety risk or urban disruption impact.
 2. **Departmental Fragmentation:** Reports are rarely categorized into structured municipal service sectors, causing delays in routing incidents to the responsible authority wing (e.g., Public Works Department vs. Sewerage & Drainage Wing).
 3. **Unverified Field Claims:** Without attached visual proof (photos or videos) and exact GPS coordinates, maintenance teams waste time locating or verifying reported defects.
-4. **Disconnected Alert & Resolution Tracking:** When a field engineer updates an issue's status, municipal dispatch alerts often remain stale or unsynchronized.
+4. **Disconnected Alert & Resolution Tracking:** When an issue changes status, its linked in-app alert should stay synchronized with the issue lifecycle.
 
 ---
 
@@ -66,20 +66,20 @@ Modern cities face thousands of daily civic infrastructure failures—potholes o
 1. **Structured Multi-Sector Ingestion:** Enable structured reporting of civic issues classified by both **Municipal Civic Sector** (11 service wings) and **Defect Category** (7 categories) with GPS coordinates.
 2. **Photo & Video Evidence Verification:** Support optional multipart image and video proof uploads (`JPG`, `PNG`, `WEBP`, `MP4`, `WEBM`, `MOV` up to `50 MB`) with instant preview and full-screen modal inspection.
 3. **Deterministic Rule-Based Intelligence:** Implement transparent, explainable mathematical models for **Priority Scoring** and **Urban Impact Assessment (0–100)** without relying on opaque black-box claims.
-4. **Automated Authority Alerting & Lifecycle Sync:** Automatically generate municipal alerts for high-priority issues (`Priority Score >= 55` or `Severity IN ('High', 'Critical')`), assign them to the corresponding civic department, and synchronize alert states when issue statuses change.
+4. **In-App Alerting & Lifecycle Sync:** Generate an in-app alert for a non-resolved issue when its priority score is at least 55 or its severity is High/Critical, assign an authority label, and synchronize linked alert states when issue statuses change.
 5. **Geospatial & Statistical Visualization:** Provide an interactive OpenStreetMap command center with coordinate clustering, sector/category/severity filters, and live operational analytics optimized for `1366×768` presentation screens.
 
 ---
 
 ## 4. Key Features
 
-- **Command Center Dashboard:** Real-time 5-KPI summary strip, Priority Intelligence Leaderboard, Active Municipal Alerts dispatch panel, Municipal Sector Distribution overview, Recent Activity feed, and Primary Urban Bottleneck card.
+- **Command Center Dashboard:** Polling 5-KPI summary, Priority Intelligence Leaderboard, Active in-app Alerts panel, Municipal Sector Distribution overview, Recent Activity feed, and Primary Urban Bottleneck card.
 - **11 Municipal Civic Sectors:** High-level departmental classification (e.g., *Roads & Transportation*, *Water Supply & Drainage*, *Traffic & Road Safety*, *Fire & Emergency Services*) distinct from defect categories, with automatic smart sector suggestion.
 - **Photo & Video Proof Upload:** Drag-and-drop or file-picker media upload on the Report Issue page, backed by `multer` disk storage and PostgreSQL `issue_evidence` relational metadata.
 - **Incident Table & Evidence Inspection Modal:** Searchable, multi-filter incident repository (`Sector`, `Category`, `Severity`, `Status`) with inline status updates and a full-screen modal showing full issue metadata, embedded image/video players, and direct file links.
 - **Interactive GIS Map View:** React-Leaflet & OpenStreetMap integration featuring severity-colored custom pins, spatial clustering for co-located issues, auto-fitting bounds, and interactive popups with sector and evidence badges.
 - **Rule-Based Priority & Impact Engines:** Multi-factor scoring with per-issue factor breakdown tags (`Severity`, `Category`, `Status`, `Spatial Density`) and human-readable impact explanations.
-- **Automated Alert Pipeline:** 4-stage dispatch workflow (`Active` → `Acknowledged` → `Resolved`) with automatic authority routing and bidirectional status synchronization.
+- **Automated Alert Pipeline:** Rule-triggered alerts with sector-based authority routing. Issue status changes synchronize linked alerts from `Active` to `Acknowledged` or `Resolved`; changing an alert directly does not update its issue.
 
 ---
 
@@ -99,13 +99,13 @@ Modern cities face thousands of daily civic infrastructure failures—potholes o
 | :--- | :--- | :--- |
 | **Frontend Framework** | React 18 (JSX, Hooks) | Component-based single-page application UI |
 | **Build Tool** | Vite 5 | Fast ES module bundler and development server (`Port 5173`) |
-| **Routing** | React Router DOM v6 | Client-side navigation and view synchronization |
+| **Routing** | React Router DOM v7 | Client-side navigation and view synchronization |
 | **Map & GIS** | Leaflet 1.9 + React-Leaflet 4 | Interactive OpenStreetMap rendering & custom markers |
 | **Styling** | Custom CSS (`App.css`, `index.css`) | Dark Slate Command Center theme optimized for `1366×768` |
 | **Backend Runtime** | Node.js (v24.x compatible) | Asynchronous server-side JavaScript runtime |
-| **Web Framework** | Express.js 5 | RESTful API routing, middleware, and static file serving (`Port 5000`) |
+| **Web Framework** | Express.js 4 | RESTful API routing, middleware, and static file serving (`Port 5000`) |
 | **File Uploads** | Multer 2 | Multipart/form-data parsing and disk storage for image/video proof |
-| **Database** | PostgreSQL 18 | Relational persistence for issues, alerts, and evidence metadata |
+| **Database** | PostgreSQL | Relational persistence for issues, alerts, and evidence metadata; the installed server version depends on the local environment |
 | **Database Driver** | `pg` (`node-postgres`) | Connection pooling and parameterized SQL queries |
 | **Environment Config** | `dotenv` & `cors` | Secure credential management and Cross-Origin Resource Sharing |
 
@@ -128,12 +128,12 @@ UrbanPulse follows a clean **3-Tier Client–Server–Database Architecture** wi
 +-------------------------------------------------------------------------+
 |                      BACKEND REST API (Port 5000)                       |
 |  Express.js Entry: backend/src/index.js                                 |
-|  Static Media Server: /uploads/* -> backend/uploads/                    |
+|  Static Media Server: /uploads/* -> configured UPLOAD_DIR               |
 |                                                                         |
 |  +---------------------------+    +----------------------------------+  |
 |  | Controllers               |    | Rule-Based Intelligence Services |  |
 |  | - healthController.js     |    | - priorityService.js             |  |
-|  | - issueController.js      |--->| - impactService.js               |  |
+|  | - issueController.js      |--->| - alertService.js                |  |
 |  | - alertController.js      |    | - alertService.js                |  |
 |  | - intelligenceController  |    +----------------------------------+  |
 |  +-------------+-------------+                                          |
@@ -164,13 +164,13 @@ UrbanPulse follows a clean **3-Tier Client–Server–Database Architecture** wi
 
 Located in `D:\UrbanPulse\frontend\src`:
 
-- **`App.jsx`**: Top-level application shell managing active tab routing, live header/sidebar counters (`totalIssues`, `criticalCount`, `activeAlertsCount`), and global refresh synchronization.
-- **`services/api.js`**: Centralized REST client exporting constants (`CIVIC_SECTORS`, `ISSUE_CATEGORIES`, `CATEGORY_TO_SECTOR_DEFAULT`), media URL resolver (`getMediaUrl`), and API methods (`getIssues`, `getIssueById`, `createIssue`, `updateIssueStatus`, `getPriorityIssues`, `getImpactIssues`, `getAlerts`, `getActiveAlerts`, `updateAlertStatus`).Automatically switches between `application/json` and `multipart/form-data` when evidence files are attached.
+- **`App.jsx`**: Top-level application shell mapping URL paths to the six pages, polling backend health/issues/active alerts, and refreshing the header/sidebar counters.
+- **`services/api.js`**: Centralized REST client exporting civic-sector/category constants, a media URL resolver (`getMediaUrl`), and API methods for issues, priority/impact intelligence, and alerts. It sends JSON for reports without files and `FormData` when evidence is attached.
 - **`pages/Dashboard.jsx`**: Operational overview displaying 5 KPI cards, the Rule-Based Priority Intelligence Leaderboard, Recent Infrastructure Activity, Active Municipal Alerts, Municipal Sector Distribution, and Primary Urban Bottleneck card.
 - **`pages/Issues.jsx`**: Comprehensive Incident Repository featuring search, 4 filter dropdowns (`Sector`, `Category`, `Severity`, `Status`), inline status mutation dropdowns, evidence badges, and the **Issue Detail & Evidence Inspection Modal** (renders full HTML5 `<img>` and `<video controls>` players).
 - **`pages/ReportIssue.jsx`**: Structured ingestion form with Municipal Sector selector, Category-to-Sector auto-suggestion, কলকাতা (Kolkata) coordinate presets, drag-and-drop Photo/Video upload with client-side MIME/extension and 50 MB size validation, live preview, and rule-based triage preview.
 - **`components/MapView.jsx`**: Interactive Leaflet map with clickable severity filter pills, Sector/Category/Severity toolbar filters, dynamic pin clustering by coordinate proximity, and rich popups showing sector and evidence badges.
-- **`pages/Alerts.jsx`**: 4-stage pipeline visualization and filterable alert cards (`All`, `Active`, `Acknowledged`, `Resolved`) showing assigned municipal authority, sector badge, priority score, and one-click Acknowledge/Resolve buttons.
+- **`pages/Alerts.jsx`**: Alert lifecycle visualization and filterable alert cards (`All`, `Active`, `Acknowledged`, `Resolved`) showing assigned authority and priority score, with Acknowledge/Resolve controls.
 - **`pages/Analytics.jsx` & `components/ImpactIntelligence.jsx`**: Statistical distribution bars for Municipal Civic Sectors, Defect Categories, Severity Breakdown, Workflow Resolution Status, and detailed 0–100 Impact Assessment cards.
 - **`components/Badges.jsx` & `components/Icons.jsx`**: Reusable UI primitives (`SeverityBadge`, `StatusBadge`, `ImpactBadge`, `SectorBadge`, `EvidenceBadge`) and clean inline SVG iconography.
 
@@ -180,13 +180,13 @@ Located in `D:\UrbanPulse\frontend\src`:
 
 Located in `D:\UrbanPulse\backend\src`:
 
-- **`index.js`**: Express application entry point. Configures CORS, JSON/URL-encoded body parsers, static serving of `/uploads` from `backend/uploads`, route mounting (`/api/health`, `/api/issues`, `/api/intelligence`, `/api/alerts`), 404 fallback, and global/Multer error handling.
+- **`index.js`**: Express application entry point. Configures CORS, JSON/URL-encoded body parsers, static serving of `/uploads` from the configured `UPLOAD_DIR` (defaulting to `backend/uploads`), API routes, 404 fallback, and generic error handling.
 - **`config/db.js`**: Initializes and exports the `pg.Pool` instance using environment variables from `backend/.env` without hardcoding any credentials.
-- **`config/upload.js`**: Configures `multer.diskStorage` to store evidence files in `backend/uploads` with collision-safe filenames (`evidence-<timestamp>-<random>.<ext>`), validates allowed MIME types and extensions, enforces a `50 MB` file size limit, and exports `handleEvidenceUpload` middleware.
+- **`config/upload.js`**: Configures `multer.diskStorage` to store evidence in `UPLOAD_DIR` or the default `backend/uploads` directory, with collision-resistant generated filenames, MIME/extension checks, and a `50 MB` per-file size limit. `routes/issueRoutes.js` adds file-signature checks and owns the upload wrapper.
 - **`controllers/issueController.js`**: Handles `getAllIssues` (with optional `sector`, `category`, `severity`, `status` query filters and `LEFT JOIN issue_evidence` aggregated via `json_agg`), `getIssueById`, `createIssue` (validates fields, cleans up orphan files on validation errors, inserts issue + evidence records, and triggers alert evaluation), and `updateIssueStatus` (updates issue status and synchronizes linked alerts).
 - **`controllers/alertController.js`**: Handles `getAllAlerts`, `getActiveAlerts`, and `updateAlertStatus` (`Active`, `Acknowledged`, `Resolved`), joining with `issues` to include `title`, `sector`, `category`, `severity`, and coordinates.
-- **`controllers/intelligenceController.js`**: Exposes ranked priority intelligence (`getPrioritizedIssues`) and urban impact assessment (`getImpactAnalysis`).
-- **`services/priorityService.js`**, **`services/impactService.js`**, **`services/alertService.js`**: Pure rule-based calculation and alert dispatch modules detailed in Sections 12–14 below.
+- **`controllers/intelligenceController.js`**: Exposes ranked priority and impact results from `priorityService.js`.
+- **`services/priorityService.js`**: Contains the rule-based priority and impact calculations. **`services/alertService.js`** evaluates the alert rule and routes alerts by sector/category.
 
 ---
 
@@ -197,24 +197,23 @@ The PostgreSQL database (`urbanpulse`) consists of **3 relational tables** defin
 ### 1. `issues` Table
 Stores core civic anomaly reports and their municipal sector classification.
 - `id` (`SERIAL PRIMARY KEY`)
-- `sector` (`VARCHAR(100) NOT NULL DEFAULT 'Roads & Transportation'`)
-- `title` (`VARCHAR(150) NOT NULL`)
-- `category` (`VARCHAR(50) NOT NULL`)
+- `sector` (`VARCHAR(100) NOT NULL DEFAULT 'Other Civic Services'`)
+- `title` (`VARCHAR(255) NOT NULL`)
+- `category` (`VARCHAR(100) NOT NULL`)
 - `description` (`TEXT NOT NULL`)
-- `latitude` (`NUMERIC(9,6) NOT NULL`)
-- `longitude` (`NUMERIC(9,6) NOT NULL`)
-- `severity` (`VARCHAR(20) NOT NULL` — `Low`, `Medium`, `High`, `Critical`)
-- `status` (`VARCHAR(20) NOT NULL DEFAULT 'Reported'` — `Reported`, `In Progress`, `Resolved`)
-- `created_at` (`TIMESTAMP DEFAULT CURRENT_TIMESTAMP`)
-- **Indexes:** `idx_issues_sector`, `idx_issues_category`, `idx_issues_severity`, `idx_issues_status`, `idx_issues_created_at`
+- `latitude` and `longitude` (`NUMERIC(10,7) NOT NULL`)
+- `severity` (`VARCHAR(20)` with a check for `Low`, `Medium`, `High`, `Critical`)
+- `status` (`VARCHAR(20) NOT NULL DEFAULT 'Reported'` with a check for `Reported`, `In Progress`, `Resolved`)
+- `created_at` (`TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`)
+- **Indexes:** sector, category, status, severity, coordinates
 
 ### 2. `alerts` Table
-Stores automated municipal dispatch alerts linked to high-priority issues.
+Stores generated municipal alerts linked to qualifying issues.
 - `id` (`SERIAL PRIMARY KEY`)
 - `issue_id` (`INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE`)
 - `alert_type` (`VARCHAR(50) NOT NULL`)
-- `priority_score` (`INTEGER NOT NULL`)
-- `authority` (`VARCHAR(100) NOT NULL`)
+- `priority_score` (`INTEGER`, nullable)
+- `authority` (`VARCHAR(100)`, nullable)
 - `message` (`TEXT NOT NULL`)
 - `status` (`VARCHAR(20) NOT NULL DEFAULT 'Active'` — `Active`, `Acknowledged`, `Resolved`)
 - `created_at` (`TIMESTAMP DEFAULT CURRENT_TIMESTAMP`)
@@ -263,24 +262,20 @@ $$\text{Priority Score} = W_{\text{severity}} + W_{\text{status}} + W_{\text{cat
 | **3. Category Weight ($W_{\text{category}}$)** | `Waterlogging`: **15**<br>`Drainage`: **14**<br>`Road Damage`: **12**<br>`Road Safety`: **12**<br>`Streetlight`: **10**<br>`Garbage`: **8**<br>`Other`: **5** | Reflects typical infrastructure cascading disruption potential. |
 | **4. Spatial Density Bonus ($B_{\text{density}}$)** | $\min(\text{nearbyCount} \times 5,\ 15)$<br>where $|\Delta \text{lat}| \le 0.01^\circ$ and $|\Delta \text{lng}| \le 0.01^\circ$ ($\approx 1.1\text{ km}$) | Rewards clusters where multiple issues occur in the same neighborhood (+5 per nearby issue, capped at +15). |
 
-**Priority Level Thresholds:**
-- **Critical Priority:** Score $\ge 70$
-- **High Priority:** Score $55 \text{ – } 69$
-- **Medium Priority:** Score $35 \text{ – } 54$
-- **Low Priority:** Score $< 35$
+The API returns the numeric score and its factor breakdown; it does not assign named priority bands. The alert trigger has its own rule: score at least 55, or High/Critical severity, provided the issue is not resolved.
 
 ---
 
 ## 13. Impact Analysis Explanation (Rule-Based Engine)
 
-Implemented in `backend/src/services/impactService.js`, the **Urban Impact Score (capped at 100)** estimates broader civic disruption:
+Implemented as `calculateImpactScore` in `backend/src/services/priorityService.js`, the **Urban Impact Score (capped at 100)** estimates broader civic disruption. It is deterministic rule-based analysis, not a trained machine-learning model:
 
 $$\text{Impact Score} = \min\left(100,\ I_{\text{severity}} + I_{\text{category}} + I_{\text{status}} + I_{\text{density}}\right)$$
 
-1. **Severity Impact ($I_{\text{severity}}$):** `Critical` = **35**, `High` = **26**, `Medium` = **16**, `Low` = **8**
-2. **Category Impact ($I_{\text{category}}$):** `Waterlogging` = **25**, `Drainage` = **22**, `Road Damage` = **20**, `Road Safety` = **20**, `Streetlight` = **16**, `Garbage` = **14**, `Other` = **10**
-3. **Status Impact ($I_{\text{status}}$):** `Reported` = **20**, `In Progress` = **12**, `Resolved` = **0**
-4. **Cluster Density Impact ($I_{\text{density}}$):** $\min(\text{nearbyIssues} \times 7,\ 20)$ within $0.01^\circ$ latitude/longitude.
+1. **Severity Impact ($I_{\text{severity}}$):** `Critical` = **45**, `High` = **35**, `Medium` = **25**, `Low` = **10**
+2. **Category Impact ($I_{\text{category}}$):** `Road Safety` and `Waterlogging` = **25**; `Road Damage` = **20**; `Streetlight` = **15**; other categories default to **5**.
+3. **Status Impact ($I_{\text{status}}$):** `Reported` = **15**, `In Progress` = **8**, `Resolved` = **0**
+4. **Cluster Density Impact ($I_{\text{density}}$):** the same proximity bonus as priority: **5 per nearby issue, capped at 15**, using independent latitude and longitude differences of at most `0.01°` (a bounding-box approximation, not a true radius).
 
 **Impact Level Classification:**
 - **Critical Impact:** Score $\ge 75$
@@ -288,7 +283,7 @@ $$\text{Impact Score} = \min\left(100,\ I_{\text{severity}} + I_{\text{category}
 - **Moderate Impact:** Score $30 \text{ – } 54$
 - **Low Impact:** Score $< 30$
 
-Each assessed issue also generates human-readable `impactFactors` explaining *why* it received its score (e.g., *"Waterlogging can disrupt traffic movement and public access"*, *"2 nearby issue(s) indicate a local infrastructure cluster"*).
+Each assessed issue includes `impactFactors` such as `High severity`, `High-impact infrastructure category`, `Issue is awaiting action`, and `Nearby infrastructure issues detected` when the corresponding score conditions apply.
 
 ---
 
@@ -296,36 +291,32 @@ Each assessed issue also generates human-readable `impactFactors` explaining *wh
 
 Implemented in `backend/src/services/alertService.js` and `backend/src/controllers/issueController.js`:
 
-1. **Trigger Rule:** When an issue is created, an alert is generated if and only if:
-   - `issue.status !== 'Resolved'`, **AND**
-   - `priorityScore >= 55` **OR** `issue.severity === 'High'` **OR** `issue.severity === 'Critical'`.
-2. **Duplicate Prevention:** Before inserting, `alertService.js` checks if an `Active` or `Acknowledged` alert already exists for `issue_id`.
-3. **Alert Type Classification:**
-   - `Critical Infrastructure Alert` if `severity === 'Critical'` or `priorityScore >= 70`
-   - `High Priority Civic Alert` otherwise
-4. **Automatic Status Synchronization:** When an administrator updates an issue's status via `PUT /api/issues/:id/status`:
+1. **Trigger Rule (implemented):** The issue's score is calculated by `priorityService.js` using the weights in Section 12. An alert is generated only when the issue is not `Resolved` and (`priorityScore >= 55` or severity is `High` or `Critical`). High severity can trigger an alert through its separate severity rule even when its priority score is below 55.
+2. **Duplicate Prevention:** Evaluations for the same issue are serialized with a PostgreSQL transaction advisory lock, then an existing alert is returned instead of inserting another. This protects concurrent application requests without deleting or rewriting prior alerts.
+3. **Alert Type and Routing:** `alert_type` and `authority` are selected from the issue's sector and category in `alertService.js`. `priority_score` stores the Section 12 score.
+4. **Issue-to-alert Status Synchronization:** When an issue's status changes through `PUT /api/issues/:id/status`:
    - Setting Issue Status to **`In Progress`** automatically updates any `Active` alert for that issue to **`Acknowledged`**.
-   - Setting Issue Status to **`Resolved`** automatically updates any `Active` or `Acknowledged` alert for that issue to **`Resolved`**.
+   - Setting Issue Status to **`Resolved`** automatically updates every linked alert not already `Resolved` to **`Resolved`**. Direct alert status updates do not change issue status.
 
 ---
 
 ## 15. Municipal / Civic Sectors Supported
 
-UrbanPulse distinguishes between **Municipal Civic Sector** (the high-level municipal corporation wing responsible for governance) and **Issue Category** (the specific physical defect type).
+UrbanPulse stores a municipal sector and an issue category as separate report fields. Alert routing uses the sector first, with category-based fallback when the sector is `Other Civic Services`. These authority names are labels in the application; they do not connect to real departments.
 
-| # | Municipal Civic Sector | Assigned Municipal Authority (Alert Routing) | Typical Defect Categories |
-| :- | :--- | :--- | :--- |
-| 1 | **Roads & Transportation** | Roads & Public Works Department (PWD) | Road Damage, Potholes, Resurfacing |
-| 2 | **Traffic & Road Safety** | Traffic Engineering & Road Safety Cell | Road Safety, Signals, Dividers, Signage |
-| 3 | **Water Supply & Drainage** | Municipal Water Supply & Sewerage Wing | Waterlogging, Drainage Blockage |
-| 4 | **Fire & Emergency Services** | Municipal Fire & Emergency Services Directorate | Critical Hazards, Structural/Fire Risks |
-| 5 | **Solid Waste Management** | Solid Waste & Sanitation Department | Garbage Overflow, Illegal Dumping |
-| 6 | **Street Lighting** | Electrical & Street Lighting Wing | Streetlight Outages, Exposed Wiring |
-| 7 | **Public Infrastructure** | Civic Engineering & Infrastructure Wing | Footpaths, Culverts, Public Facilities |
-| 8 | **Environment & Pollution** | Urban Environment & Pollution Control Cell | Air/Water/Noise Anomalies |
-| 9 | **Parks & Public Spaces** | Parks, Gardens & Public Spaces Directorate | Park Maintenance, Encroachments |
-| 10 | **Public Health & Sanitation** | Municipal Public Health & Hygiene Department | Stagnant Water, Vector Breeding Risks |
-| 11 | **Other Civic Services** | Central Municipal Control Room | General Civic Anomalies |
+| # | Municipal Civic Sector | Authority label assigned by the current code |
+| :- | :--- | :--- |
+| 1 | **Roads & Transportation** | Roads Department |
+| 2 | **Traffic & Road Safety** | Traffic Authority |
+| 3 | **Water Supply & Drainage** | Municipal Corporation / Water & Drainage Authority |
+| 4 | **Fire & Emergency Services** | Fire & Emergency Services |
+| 5 | **Solid Waste Management** | Waste Management Department |
+| 6 | **Street Lighting** | Electrical / Street Lighting Department |
+| 7 | **Public Infrastructure** | Public Infrastructure Department |
+| 8 | **Environment & Pollution** | Environment Department |
+| 9 | **Parks & Public Spaces** | Parks Department |
+| 10 | **Public Health & Sanitation** | Public Health / Sanitation Department |
+| 11 | **Other Civic Services** | Category-based fallback; defaults to Municipal Corporation |
 
 ---
 
@@ -336,7 +327,8 @@ Citizens and field inspectors can attach visual proof when submitting an issue:
 - **Supported Image Formats:** `.jpg`, `.jpeg`, `.png`, `.webp` (`image/jpeg`, `image/png`, `image/webp`)
 - **Supported Video Formats:** `.mp4`, `.webm`, `.mov` (`video/mp4`, `video/webm`, `video/quicktime`)
 - **Maximum File Size:** `50 MB` per file (enforced on both frontend and backend Multer middleware)
-- **Storage Mechanism:** Files are stored locally in `D:\UrbanPulse\backend\uploads\` (ignored by Git except `.gitkeep`) and served statically at `http://localhost:5000/uploads/<filename>`.
+- **Storage Mechanism:** Files are stored in `backend/uploads/` by default or in the absolute directory configured by backend `UPLOAD_DIR`. The API validates extension, declared MIME type, and file signature before accepting media. Files are served statically under `/uploads/`.
+- **Persistent hosting:** Configure `UPLOAD_DIR` as a mounted persistent volume shared with the backend instance serving media, and back up that volume alongside the database. Ephemeral container disks lose uploads on restart; when using multiple instances, use shared storage or route media requests to the instance that owns the files. This project does not provision hosted storage.
 - **Database Linking:** File metadata (`file_name`, `file_path`, `file_type`, `file_size`) is stored in `issue_evidence` with `ON DELETE CASCADE` to `issues(id)`.
 - **Orphan File Protection:** If an issue submission fails backend field validation (`HTTP 400`), `issueController.js` automatically cleans up the temporary uploaded file from disk.
 
@@ -356,7 +348,7 @@ Base URL: `http://localhost:5000`
 | `GET` | `/api/intelligence/priorities` | Returns issues ranked by rule-based `priorityScore` | None |
 | `GET` | `/api/intelligence/impact` | Returns issues ranked by rule-based `impactScore` (0–100) | None |
 | `GET` | `/api/alerts` | Returns all municipal alerts with joined issue details | None |
-| `GET` | `/api/alerts/active` | Returns only `Active` and `Acknowledged` alerts | None |
+| `GET` | `/api/alerts/active` | Returns only `Active` alerts | None |
 | `PUT` | `/api/alerts/:id/status` | Updates an alert's lifecycle status | JSON: `{ "status": "Active" \| "Acknowledged" \| "Resolved" }` |
 
 ---
@@ -382,11 +374,9 @@ D:\UrbanPulse\
 │   │   │   └── issueRoutes.js            # /api/issues routes (+ Multer middleware)
 │   │   ├── services/
 │   │   │   ├── alertService.js           # Automated alert trigger & sector authority routing
-│   │   │   ├── impactService.js          # Rule-based urban impact scoring (0-100)
 │   │   │   └── priorityService.js        # Rule-based multi-factor priority scoring
 │   │   └── index.js                      # Express server entry point & /uploads static server
-│   ├── uploads/
-│   │   └── .gitkeep                      # Local storage directory for uploaded evidence
+│   ├── uploads/                          # Default evidence storage; files are ignored by Git
 │   ├── .env.example                      # Safe template for environment variables
 │   └── package.json
 ├── frontend/
@@ -399,7 +389,7 @@ D:\UrbanPulse\
 │   │   │   ├── MapView.jsx               # Interactive Leaflet map with sector/severity filters
 │   │   │   └── Sidebar.jsx               # Left navigation rail with live telemetry counters
 │   │   ├── pages/
-│   │   │   ├── Alerts.jsx                # Municipal Alert Center & 4-stage dispatch pipeline
+│   │   │   ├── Alerts.jsx                # Municipal Alert Center & 4-step pipeline graphic
 │   │   │   ├── Analytics.jsx             # Sector, Category, Severity & Status charts
 │   │   │   ├── Dashboard.jsx             # Main Command Center dashboard
 │   │   │   ├── Issues.jsx                # Incident table, filters & Evidence Inspection Modal
@@ -463,11 +453,13 @@ Ensure the following software is installed on your machine before running UrbanP
    ```powershell
    psql -U postgres -d urbanpulse -f D:\UrbanPulse\database\schema.sql
    ```
-   *Note: `schema.sql` uses `CREATE TABLE IF NOT EXISTS` and `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, making it safe to run on both fresh and existing databases.*
+   *Note: `schema.sql` uses `CREATE TABLE IF NOT EXISTS` and inserts each sample issue only when no row with that title exists. It does not run `ALTER TABLE` migrations. The seed check is suitable for sequential reruns; concurrent schema runs are not protected by a unique title constraint.*
 
 ---
 
 ## 22. Environment Variable Configuration
+
+The frontend uses `VITE_API_URL` as its API prefix. Leave it unset for local development: Vite proxies `/api` and `/uploads` to `http://localhost:5000` (or `VITE_DEV_API_ORIGIN`). For production, set `VITE_API_URL` to the deployed backend API prefix, including `/api` (for example `https://api.example.com/api`). Evidence URLs use the same origin. Set backend `CORS_ORIGINS` to a comma-separated list of allowed frontend origins in production; local Vite origins are allowed by default outside production, while browser origins are denied in production when the allowlist is empty. Set backend `UPLOAD_DIR` to a mounted persistent directory on the host.
 
 1. Inside `D:\UrbanPulse\backend`, copy `.env.example` to `.env`:
    ```powershell
@@ -532,7 +524,7 @@ Follow this 5-minute walkthrough during your college project demonstration:
    - Show the rendered photo or play the video inside the modal, then close it.
    - Change the issue's status dropdown from `Reported` to `In Progress`.
 4. **Verify Automated Alert & Authority Routing (`Alerts` tab):**
-   - Navigate to **Municipal Alerts** and show that an alert was automatically dispatched to the **Municipal Water Supply & Sewerage Wing** with the calculated priority score, and its status automatically synchronized to `Acknowledged`.
+   - Navigate to **Municipal Alerts** and show the in-app alert with its priority score and assigned authority label. Set the issue to `In Progress` to verify its linked `Active` alert changes to `Acknowledged`; no external dispatch is sent.
 5. **Geospatial Map & Analytics (`Map View` & `Analytics` tabs):**
    - On **Map View**, filter markers by **Sector** or click a marker pin to show its popup containing the Sector Badge, Severity Badge, and Evidence Badge.
    - On **Analytics**, show the **Municipal Civic Sectors** distribution chart and the **0–100 Infrastructure Impact Assessment** breakdown.
