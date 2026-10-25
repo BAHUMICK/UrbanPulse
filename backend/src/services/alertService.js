@@ -1,6 +1,12 @@
 const pool = require('../config/db');
+const { calculatePriorityScore } = require('./priorityService');
 
 const generateAlertForIssue = async (issue) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Serialize evaluations for this issue; the lock is released on commit/rollback.
+    await client.query('SELECT pg_advisory_xact_lock($1, $2)', [74129, issue.id]);
   // -----------------------------------------------------
   // PREVENT DUPLICATE ALERTS
   // -----------------------------------------------------
@@ -22,13 +28,21 @@ const generateAlertForIssue = async (issue) => {
     LIMIT 1;
   `;
 
-  const existingAlert = await pool.query(
+  const existingAlert = await client.query(
     existingAlertQuery,
     [issue.id]
   );
 
   if (existingAlert.rows.length > 0) {
+    await client.query('COMMIT');
     return existingAlert.rows[0];
+  }
+
+  const allIssuesResult = await client.query('SELECT id, latitude, longitude, severity, status, category FROM issues');
+  const score = calculatePriorityScore(issue, allIssuesResult.rows).totalScore;
+  if (issue.status === 'Resolved' || (score < 55 && !['High', 'Critical'].includes(issue.severity))) {
+    await client.query('COMMIT');
+    return null;
   }
 
   // -----------------------------------------------------
@@ -36,23 +50,10 @@ const generateAlertForIssue = async (issue) => {
   // -----------------------------------------------------
 
   let alertType = 'Infrastructure Issue';
-  let priorityScore = 30;
+  const priorityScore = score;
   let authority = 'Municipal Corporation';
 
   // -----------------------------------------------------
-  // PRIORITY SCORE (Preserve existing algorithm)
-  // -----------------------------------------------------
-
-  if (issue.severity === 'Critical') {
-    priorityScore = 100;
-  } else if (issue.severity === 'High') {
-    priorityScore = 80;
-  } else if (issue.severity === 'Medium') {
-    priorityScore = 50;
-  } else {
-    priorityScore = 25;
-  }
-
   // -----------------------------------------------------
   // SECTOR / CATEGORY → ALERT TYPE + AUTHORITY ROUTING
   // -----------------------------------------------------
@@ -118,7 +119,7 @@ const generateAlertForIssue = async (issue) => {
 
   const message =
     `${issue.severity} severity ${issue.category.toLowerCase()} defect filed under ${issue.sector || 'civic services'}. ` +
-    `Automated dispatch assigned to ${authority}.`;
+    `In-app alert routed to authority label ${authority}.`;
 
   // -----------------------------------------------------
   // INSERT ALERT
@@ -164,9 +165,17 @@ const generateAlertForIssue = async (issue) => {
     authority
   ];
 
-  const result = await pool.query(query, values);
+  const result = await client.query(query, values);
+
+  await client.query('COMMIT');
 
   return result.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 module.exports = {

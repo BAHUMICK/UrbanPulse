@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Ensure local uploads directory exists
-const uploadDir = path.join(__dirname, '../../uploads');
+const uploadDir = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, '../../uploads'));
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -46,20 +46,25 @@ const ALLOWED_EXTENSIONS = [
   '.webm',
   '.mov',
 ];
+const MIME_BY_EXTENSION = {
+  '.jpg': ['image/jpeg', 'image/jpg'], '.jpeg': ['image/jpeg', 'image/jpg'],
+  '.png': ['image/png'], '.webp': ['image/webp'], '.mp4': ['video/mp4'],
+  '.webm': ['video/webm'], '.mov': ['video/quicktime']
+};
 
 const fileFilter = (req, file, cb) => {
   const ext = path.extname(file.originalname).toLowerCase();
   const mimeType = file.mimetype.toLowerCase();
 
   const isAllowedExt = ALLOWED_EXTENSIONS.includes(ext);
-  const isAllowedMime = ALLOWED_MIME_TYPES.includes(mimeType);
+  const isAllowedMime = ALLOWED_MIME_TYPES.includes(mimeType) && MIME_BY_EXTENSION[ext]?.includes(mimeType);
 
   if (isAllowedExt && isAllowedMime) {
     cb(null, true);
   } else {
     cb(
       new Error(
-        `Invalid file type (${ext || file.mimetype}). Supported formats: JPG, PNG, WEBP for photos, and MP4, WEBM, MOV for videos.`
+        'Unsupported evidence file type. Use JPG, PNG, WEBP, MP4, WEBM, or MOV with a matching file type.'
       ),
       false
     );

@@ -23,14 +23,13 @@ const getPriorityIssuesController =
     } catch (err) {
       console.error(
         'Error calculating priority intelligence:',
-        err.message
+        err
       );
 
       return res.status(500).json({
         success: false,
         message:
           'Failed to calculate infrastructure priority intelligence',
-        error: err.message
       });
     }
   };
@@ -55,14 +54,13 @@ const getImpactIssuesController =
     } catch (err) {
       console.error(
         'Error calculating impact intelligence:',
-        err.message
+        err
       );
 
       return res.status(500).json({
         success: false,
         message:
           'Failed to calculate infrastructure impact intelligence',
-        error: err.message
       });
     }
   };

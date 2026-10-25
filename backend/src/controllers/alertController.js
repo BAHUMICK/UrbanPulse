@@ -37,13 +37,12 @@ const getAllAlerts = async (req, res) => {
   } catch (err) {
     console.error(
       'Error fetching alerts:',
-      err.message
+      err
     );
 
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch alerts',
-      error: err.message
     });
   }
 };
@@ -86,13 +85,12 @@ const getActiveAlerts = async (req, res) => {
   } catch (err) {
     console.error(
       'Error fetching active alerts:',
-      err.message
+      err
     );
 
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch active alerts',
-      error: err.message
     });
   }
 };
@@ -164,13 +162,12 @@ const updateAlertStatus = async (req, res) => {
   } catch (err) {
     console.error(
       'Error updating alert status:',
-      err.message
+      err
     );
 
     return res.status(500).json({
       success: false,
       message: 'Failed to update alert status',
-      error: err.message
     });
   }
 };

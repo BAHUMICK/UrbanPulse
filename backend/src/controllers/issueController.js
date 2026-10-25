@@ -135,12 +135,11 @@ const getAllIssues = async (req, res) => {
       data: result.rows
     });
   } catch (err) {
-    console.error('Error fetching issues:', err.message);
+    console.error('Error fetching issues:', err);
 
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch infrastructure issues',
-      error: err.message
     });
   }
 };
@@ -205,12 +204,11 @@ const getIssueById = async (req, res) => {
       data: result.rows[0]
     });
   } catch (err) {
-    console.error('Error fetching issue by ID:', err.message);
+    console.error('Error fetching issue by ID:', err);
 
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch infrastructure issue details',
-      error: err.message
     });
   }
 };
@@ -445,12 +443,11 @@ const createIssue = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Error creating issue:', err.message);
+    console.error('Error creating issue:', err);
 
     return res.status(500).json({
       success: false,
       message: 'Failed to create infrastructure issue',
-      error: err.message
     });
   }
 };
@@ -551,12 +548,11 @@ const updateIssueStatus = async (req, res) => {
       data: updatedIssue
     });
   } catch (err) {
-    console.error('Error updating issue status:', err.message);
+    console.error('Error updating issue status:', err);
 
     return res.status(500).json({
       success: false,
       message: 'Failed to update issue status',
-      error: err.message
     });
   }
 };

@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
-const path = require('path');
+const { uploadDir } = require('./config/upload');
 
 const healthRoutes = require('./routes/healthRoutes');
 const issueRoutes = require('./routes/issueRoutes');
@@ -13,12 +13,22 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Core Middlewares
-app.use(cors());
+const defaultOrigins = process.env.NODE_ENV === 'production'
+  ? ['https://urbanpulse-three.vercel.app']
+  : ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://urbanpulse-three.vercel.app'];
+const allowedOrigins = (process.env.CORS_ORIGINS || defaultOrigins.join(','))
+  .split(',').map((origin) => origin.trim()).filter(Boolean);
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Origin is not allowed by CORS'));
+  }
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static uploads for evidence media (photos & videos)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(uploadDir));
 
 // API Routes
 app.use('/api', healthRoutes);
@@ -42,14 +52,12 @@ app.use((err, req, res, next) => {
     return res.status(400).json({
       success: false,
       message: 'Evidence file is too large. Maximum allowed size is 50MB.',
-      error: err.message
     });
   }
 
   res.status(500).json({
     success: false,
     message: 'Internal server error',
-    error: err.message
   });
 });
 

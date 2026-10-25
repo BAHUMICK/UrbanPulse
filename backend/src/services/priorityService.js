@@ -8,16 +8,18 @@ const SEVERITY_WEIGHTS = {
 };
 
 const STATUS_WEIGHTS = {
-  Reported: 20,
-  'In Progress': 10,
+  Reported: 15,
+  'In Progress': 8,
   Resolved: 0
 };
 
 const CATEGORY_WEIGHTS = {
-  'Road Safety': 20,
-  Waterlogging: 20,
-  'Road Damage': 15,
+  Waterlogging: 15,
+  Drainage: 14,
+  'Road Damage': 12,
+  'Road Safety': 12,
   Streetlight: 10,
+  Garbage: 8,
   Other: 5
 };
 
@@ -75,14 +77,14 @@ function calculateDensityBonus(issue, allIssues) {
         )
       );
 
-    if (distanceKm <= 1) {
+    if (Math.abs(latDifference) <= 0.01 && Math.abs(lngDifference) <= 0.01) {
       nearbyCount++;
     }
   }
 
   return Math.min(
     nearbyCount * 5,
-    20
+    15
   );
 }
 
