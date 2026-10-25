@@ -1,0 +1,124 @@
+-- =============================================================================
+-- UrbanPulse - Supabase PostgreSQL Database Initialization & Migration Script
+-- Platform: City Infrastructure Anomaly & Impact Intelligence Platform
+-- Target: Supabase Hosted PostgreSQL (Run in Supabase Dashboard -> SQL Editor)
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- 1. TABLE: issues
+-- Stores all reported urban infrastructure anomalies across municipal sectors.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS issues (
+    id SERIAL PRIMARY KEY,
+    sector VARCHAR(100) NOT NULL DEFAULT 'Other Civic Services',
+    title VARCHAR(255) NOT NULL,
+    category VARCHAR(100) NOT NULL,
+    description TEXT NOT NULL,
+    latitude NUMERIC(10, 7) NOT NULL,
+    longitude NUMERIC(10, 7) NOT NULL,
+    severity VARCHAR(20) NOT NULL CHECK (severity IN ('Low', 'Medium', 'High', 'Critical')),
+    status VARCHAR(20) NOT NULL DEFAULT 'Reported' CHECK (status IN ('Reported', 'In Progress', 'Resolved')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Performance Indexes for filtering, geospatial queries, and lifecycle lookups
+CREATE INDEX IF NOT EXISTS idx_issues_sector ON issues(sector);
+CREATE INDEX IF NOT EXISTS idx_issues_category ON issues(category);
+CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
+CREATE INDEX IF NOT EXISTS idx_issues_severity ON issues(severity);
+CREATE INDEX IF NOT EXISTS idx_issues_coordinates ON issues(latitude, longitude);
+
+-- -----------------------------------------------------------------------------
+-- 2. TABLE: alerts
+-- Stores automated municipal dispatch alerts routed to specific authorities.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS alerts (
+    id SERIAL PRIMARY KEY,
+    issue_id INTEGER NOT NULL
+        REFERENCES issues(id)
+        ON DELETE CASCADE,
+    alert_type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    priority_score INTEGER,
+    authority VARCHAR(100),
+    status VARCHAR(20) NOT NULL DEFAULT 'Active'
+        CHECK (status IN ('Active', 'Acknowledged', 'Resolved')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for foreign key lookups and alert dispatch feed sorting
+CREATE INDEX IF NOT EXISTS idx_alerts_issue_id ON alerts(issue_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
+CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON alerts(created_at);
+
+-- -----------------------------------------------------------------------------
+-- 3. TABLE: issue_evidence
+-- Stores photo/video attachment metadata associated with infrastructure issues.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS issue_evidence (
+    id SERIAL PRIMARY KEY,
+    issue_id INTEGER NOT NULL
+        REFERENCES issues(id)
+        ON DELETE CASCADE,
+    file_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    file_type VARCHAR(50) NOT NULL,
+    file_size INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for fast evidence lookup during issue inspection and detail rendering
+CREATE INDEX IF NOT EXISTS idx_issue_evidence_issue_id ON issue_evidence(issue_id);
+
+-- -----------------------------------------------------------------------------
+-- 4. INITIAL SEED DATA (Idempotent: Inserts only if absent)
+-- -----------------------------------------------------------------------------
+INSERT INTO issues (sector, title, category, description, latitude, longitude, severity, status)
+SELECT
+    'Roads & Transportation',
+    'Deep Pothole on Main Arterial Corridor',
+    'Road Damage',
+    'Severe pothole approximately 45cm wide and 12cm deep located in the right lane near Sector 5 crossing. Creates severe accident risk for two-wheelers during rush hour.',
+    22.5802100,
+    88.4312500,
+    'High',
+    'Reported'
+WHERE NOT EXISTS (
+    SELECT 1 FROM issues WHERE title = 'Deep Pothole on Main Arterial Corridor'
+);
+
+INSERT INTO issues (sector, title, category, description, latitude, longitude, severity, status)
+SELECT
+    'Street Lighting',
+    'Cluster of Broken Streetlights on Outer Promenade',
+    'Streetlight',
+    'Four consecutive municipal streetlights are completely dead, causing hazardous low-visibility conditions along the pedestrian walkway and cycling lane.',
+    22.5724500,
+    88.4218900,
+    'Medium',
+    'In Progress'
+WHERE NOT EXISTS (
+    SELECT 1 FROM issues WHERE title = 'Cluster of Broken Streetlights on Outer Promenade'
+);
+
+INSERT INTO issues (sector, title, category, description, latitude, longitude, severity, status)
+SELECT
+    'Water Supply & Drainage',
+    'Clogged Storm Drain Causing Monsoon Waterlogging',
+    'Waterlogging',
+    'Stormwater inlet blocked by debris and plastic waste, producing 30cm of stagnant standing water spanning across the central bus transit terminal.',
+    22.5691000,
+    88.4125000,
+    'Critical',
+    'Reported'
+WHERE NOT EXISTS (
+    SELECT 1 FROM issues WHERE title = 'Clogged Storm Drain Causing Monsoon Waterlogging'
+);
+
+-- =============================================================================
+-- VERIFICATION QUERIES (Optional: Run to confirm successful setup)
+-- =============================================================================
+-- SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('issues', 'alerts', 'issue_evidence');
+-- SELECT count(*) AS seed_issues_count FROM issues;
+-- =============================================================================

@@ -22,9 +22,10 @@ CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
 CREATE INDEX IF NOT EXISTS idx_issues_severity ON issues(severity);
 CREATE INDEX IF NOT EXISTS idx_issues_coordinates ON issues(latitude, longitude);
 
--- Sample Seed Data (3 Realistic City Infrastructure Issues)
-INSERT INTO issues (sector, title, category, description, latitude, longitude, severity, status) VALUES
-(
+-- Sample records are inserted individually only when absent, so rerunning this
+-- schema preserves existing records and does not duplicate the sample issues.
+INSERT INTO issues (sector, title, category, description, latitude, longitude, severity, status)
+SELECT
     'Roads & Transportation',
     'Deep Pothole on Main Arterial Corridor',
     'Road Damage',
@@ -33,26 +34,26 @@ INSERT INTO issues (sector, title, category, description, latitude, longitude, s
     88.4312500,
     'High',
     'Reported'
-),
-(
-    'Street Lighting',
-    'Cluster of Broken Streetlights on Outer Promenade',
-    'Streetlight',
+WHERE NOT EXISTS (
+    SELECT 1 FROM issues WHERE title = 'Deep Pothole on Main Arterial Corridor'
+);
+
+INSERT INTO issues (sector, title, category, description, latitude, longitude, severity, status)
+SELECT
+    'Street Lighting', 'Cluster of Broken Streetlights on Outer Promenade', 'Streetlight',
     'Four consecutive municipal streetlights are completely dead, causing hazardous low-visibility conditions along the pedestrian walkway and cycling lane.',
-    22.5724500,
-    88.4218900,
-    'Medium',
-    'In Progress'
-),
-(
-    'Water Supply & Drainage',
-    'Clogged Storm Drain Causing Monsoon Waterlogging',
-    'Waterlogging',
+    22.5724500, 88.4218900, 'Medium', 'In Progress'
+WHERE NOT EXISTS (
+    SELECT 1 FROM issues WHERE title = 'Cluster of Broken Streetlights on Outer Promenade'
+);
+
+INSERT INTO issues (sector, title, category, description, latitude, longitude, severity, status)
+SELECT
+    'Water Supply & Drainage', 'Clogged Storm Drain Causing Monsoon Waterlogging', 'Waterlogging',
     'Stormwater inlet blocked by debris and plastic waste, producing 30cm of stagnant standing water spanning across the central bus transit terminal.',
-    22.5691000,
-    88.4125000,
-    'Critical',
-    'Reported'
+    22.5691000, 88.4125000, 'Critical', 'Reported'
+WHERE NOT EXISTS (
+    SELECT 1 FROM issues WHERE title = 'Clogged Storm Drain Causing Monsoon Waterlogging'
 );
 
 
