@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 process.env.AUTH_SECRET = 'test-only-random-secret-with-at-least-32-bytes';
 
-const { hashPassword, verifyPassword, authRateLimit } = require('../src/controllers/authController');
+const { hashPassword, verifyPassword, createAuthRateLimiter } = require('../src/controllers/authController');
 const { createCsrfToken, validCsrfToken, requireRole, cookieOptions } = require('../src/middleware/auth');
 const { isAlertEligible } = require('../src/services/alertService');
 
@@ -21,13 +21,26 @@ test('CSRF tokens validate and reject tampering', () => {
   assert.equal(validCsrfToken(''), false);
 });
 
-test('production session cookies use HTTPS-only and cross-site-safe flags', () => {
+test('production session cookies use HTTPS-only and same-origin-safe flags', () => {
   const original = process.env.NODE_ENV;
   process.env.NODE_ENV = 'production';
   try {
     assert.match(cookieOptions(60), /HttpOnly/);
-    assert.match(cookieOptions(60), /SameSite=None/);
+    assert.match(cookieOptions(60), /SameSite=Lax/);
     assert.match(cookieOptions(60), /Secure/);
+    assert.match(cookieOptions(60), /HttpOnly/);
+  } finally {
+    process.env.NODE_ENV = original;
+  }
+});
+
+test('development session cookies retain Lax without requiring HTTPS', () => {
+  const original = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'development';
+  try {
+    assert.match(cookieOptions(60), /SameSite=Lax/);
+    assert.doesNotMatch(cookieOptions(60), /; Secure/);
+    assert.match(cookieOptions(60), /HttpOnly/);
   } finally {
     process.env.NODE_ENV = original;
   }
@@ -45,12 +58,25 @@ test('authorization middleware distinguishes missing role and allowed role', () 
   assert.equal(responseFor({ role: 'admin' }).continued, true);
 });
 
-test('authentication rate limit permits the initial attempts and then rejects', () => {
-  const req = { ip: `test-${Date.now()}` };
-  const response = { statusCode: 200, status(value) { this.statusCode = value; return this; }, json(value) { this.body = value; return this; } };
-  for (let i = 0; i < 10; i += 1) authRateLimit(req, response, () => {});
-  authRateLimit(req, response, () => assert.fail('rate-limited request continued'));
-  assert.equal(response.statusCode, 429);
+test('authentication rate limit enforces the limit and resets after its window', () => {
+  let now = 1000;
+  const limit = createAuthRateLimiter({ limit: 2, windowMs: 100, now: () => now });
+  const req = { ip: 'rate-limit-test' };
+  const responseFor = () => ({ statusCode: 200, status(value) { this.statusCode = value; return this; }, json(value) { this.body = value; return this; } });
+  const response1 = responseFor();
+  limit(req, response1, () => {});
+  const response2 = responseFor();
+  limit(req, response2, () => {});
+  const blocked = responseFor();
+  limit(req, blocked, () => assert.fail('rate-limited request continued'));
+  assert.equal(blocked.statusCode, 429);
+
+  now += 101;
+  const afterWindow = responseFor();
+  let continued = false;
+  limit(req, afterWindow, () => { continued = true; });
+  assert.equal(continued, true);
+  assert.equal(afterWindow.statusCode, 200);
 });
 
 test('alert eligibility preserves existing severity and resolved-status rules', () => {

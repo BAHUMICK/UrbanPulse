@@ -12,13 +12,15 @@ function authSecret() {
 
 function cookieOptions(maxAge) {
   const secure = process.env.NODE_ENV === 'production';
-  return `Path=/api; HttpOnly; SameSite=${secure ? 'None' : 'Lax'}; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
+  return `Path=/api; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 }
 
 function readCookie(req, name) {
   const raw = req.headers.cookie || '';
   const pair = raw.split(';').map((value) => value.trim()).find((value) => value.startsWith(`${name}=`));
-  return pair ? decodeURIComponent(pair.slice(name.length + 1)) : '';
+  if (!pair) return '';
+  try { return decodeURIComponent(pair.slice(name.length + 1)); }
+  catch { return ''; }
 }
 
 function hashToken(token) {

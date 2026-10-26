@@ -459,7 +459,7 @@ Ensure the following software is installed on your machine before running UrbanP
 
 ## 22. Environment Variable Configuration
 
-The frontend uses `VITE_API_URL` as its API prefix. Leave it unset for local development: Vite proxies `/api` and `/uploads` to `http://localhost:5000` (or `VITE_DEV_API_ORIGIN`). For production, set `VITE_API_URL` to the deployed backend API prefix, including `/api` (for example `https://api.example.com/api`). Evidence URLs use the same origin. Set backend `CORS_ORIGINS` to a comma-separated list of allowed frontend origins in production; local Vite origins are allowed by default outside production, while browser origins are denied in production when the allowlist is empty. Set backend `UPLOAD_DIR` to a mounted persistent directory on the host.
+The frontend uses `VITE_API_URL` as its API prefix and defaults to `/api`. Leave it empty both locally and in Vercel when using the existing routing: Vite proxies `/api` and `/uploads` to `http://localhost:5000` (or `VITE_DEV_API_ORIGIN`) locally, and `frontend/vercel.json` rewrites those paths to the Render backend in production. This keeps browser requests on the frontend origin, so the session cookie is first-party and `SameSite=Lax` works for credentialed `fetch` requests. Set backend `CORS_ORIGINS` to the exact allowed frontend origins; the Vercel rewrite preserves the browser-facing origin. Set backend `UPLOAD_DIR` to a mounted persistent directory on the host. Set `VITE_API_URL` only if intentionally bypassing the rewrite with a direct cross-origin API URL; then configure credentialed CORS and test browser cookie behavior explicitly.
 
 1. Inside `D:\UrbanPulse\backend`, copy `.env.example` to `.env`:
    ```powershell
@@ -549,7 +549,7 @@ To maintain transparency and academic rigor, the following scope boundaries appl
 
 1. **Rule-Based Heuristic Scoring (No Trained ML Model):** Priority and impact scores use deterministic mathematical weights rather than a machine-learning model trained on historical city maintenance datasets.
 2. **Local Disk Media Storage:** Uploaded photos and videos are stored in `backend/uploads/` on the local server filesystem rather than cloud object storage (such as AWS S3 or Google Cloud Storage).
-3. **Open Access Demonstration Mode:** Role-based authentication (Citizen login vs. Municipal Commissioner login) is omitted so evaluators can seamlessly test both issue reporting and administrative status triage from a single interface.
+3. **Authentication provisioning:** Citizen accounts and administrator-only status actions are implemented. The additive authentication migration and a trusted database operator's first-admin promotion must be completed before those flows are available in a deployment.
 4. **Fixed Coordinate Radius Approximation:** Spatial density clustering uses a $\pm 0.01^\circ$ latitude/longitude bounding box ($\approx 1.1\text{ km}$) rather than PostGIS spherical distance queries.
 
 ---
@@ -557,7 +557,7 @@ To maintain transparency and academic rigor, the following scope boundaries appl
 ## 28. Future Scope & Enhancements
 
 1. **Computer Vision Verification:** Integrate a lightweight image classification model to automatically verify pothole/waterlogging severity from uploaded citizen photos.
-2. **Role-Based Access Control (RBAC):** Add JWT authentication separating public citizen reporting from department-specific municipal engineer dashboards.
+2. **Expanded Role-Based Access Control (RBAC):** Add department-scoped roles and permissions for municipal engineer dashboards.
 3. **Cloud Media Storage & CDN:** Migrate `multer` disk storage to cloud object storage (AWS S3 / Cloudinary) with automatic video compression.
 4. **PostGIS Spatial Indexing:** Upgrade coordinate queries to PostgreSQL PostGIS `ST_DWithin` for exact meter-level radius clustering and ward boundary polygon mapping.
 5. **SMS / Email Authority Notifications:** Connect `alertService.js` to Twilio or SMTP gateways to notify field engineers immediately when a `Critical Infrastructure Alert` is triggered.
@@ -574,8 +574,11 @@ To maintain transparency and academic rigor, the following scope boundaries appl
 
 The API stores citizen accounts in `app_users` and opaque session-token hashes in
 `auth_sessions`. Passwords are hashed with Node.js scrypt. Session cookies are
-HttpOnly and expire after seven days; unsafe API requests also require a signed
-CSRF header. Public registration always creates the `citizen` role. Issue status
+HttpOnly and expire after seven days; production cookies use `Secure` and
+`SameSite=Lax`, while local HTTP development omits `Secure`. The current Vercel
+rewrite keeps browser API calls same-origin, where Lax cookies are sent with
+credentialed fetch requests. Unsafe API requests also require a signed CSRF
+header. Public registration always creates the `citizen` role. Issue status
 and alert status changes require an administrator on the server.
 
 Before enabling authentication, take a normal database backup and apply
@@ -612,3 +615,27 @@ to use the same-origin rewrite, build/deploy the frontend, and provision an
 administrator only if the deployment requires one. Verify login and cookie
 behavior in the deployed browser before announcing the release. Never use the
 production database for development seed scripts.
+
+The login and registration limiter allows 10 requests per IP per 15 minutes.
+It is in-memory and applies per Node.js process, so restarts clear counters and
+multiple backend instances do not share limits. Keep the local limiter for
+development; before production exposure, configure a shared-store limiter or
+hosting-edge rate limit.
+
+The migration must be applied to the intended PostgreSQL database before
+registration or session operations can succeed. This repository does not run
+migrations automatically and has no migration-tracking mechanism; operators
+must back up the database, apply the additive migration once, and record its
+completion in their deployment process. Do not run the seed/sample statements
+from `database/schema.sql` against production.
+
+Evidence files are stored on disk. Configure `UPLOAD_DIR` to persistent storage
+for deployments, back it up with the database, and use shared storage or
+instance-aware routing when running multiple backend instances. Otherwise
+evidence may disappear after restarts or be unavailable on another instance.
+
+Duplicate registration currently returns HTTP 409 with an account-exists
+message to preserve a clear signup experience. This reveals whether an email
+is registered; changing only the message would not remove that signal. Fully
+reducing enumeration requires a flow such as email verification or account
+recovery that gives equivalent responses for existing and new addresses.
