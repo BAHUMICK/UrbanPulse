@@ -1,4 +1,5 @@
 import React from 'react';
+import { navigationForRole } from '../routeAccess';
 import {
   IconDashboard,
   IconMap,
@@ -19,7 +20,7 @@ function Sidebar({
   user,
   onLogout,
 }) {
-  const navItems = [
+  const allNavItems = [
     {
       id: 'dashboard',
       label: 'Dashboard',
@@ -34,8 +35,8 @@ function Sidebar({
     },
     {
       id: 'issues',
-      label: 'Issues',
-      sublabel: 'Browse reports',
+      label: user?.role === 'admin' ? 'Issues' : 'My reports',
+      sublabel: user?.role === 'admin' ? 'Browse reports' : 'Track your reports',
       icon: <IconIssues size={18} />,
       badge: totalIssuesCount > 0 ? totalIssuesCount : null,
       badgeType: 'neutral',
@@ -61,6 +62,9 @@ function Sidebar({
       icon: <IconAnalytics size={18} />,
     },
   ];
+  const allowedOrder = navigationForRole(user?.role);
+  const navItems = allNavItems.filter((item) => allowedOrder.includes(item.id))
+    .sort((first, second) => allowedOrder.indexOf(first.id) - allowedOrder.indexOf(second.id));
 
   return (
     <aside className="app-sidebar">
@@ -77,7 +81,7 @@ function Sidebar({
       </div>
 
       {/* COMMAND SECTOR LABEL */}
-      <div className="sidebar-section-title">COMMAND NAVIGATION</div>
+      <div className="sidebar-section-title">{user?.role === 'admin' ? 'COMMAND NAVIGATION' : 'YOUR REPORTS'}</div>
 
       {/* NAVIGATION ITEMS */}
       <nav className="sidebar-nav">
@@ -88,6 +92,9 @@ function Sidebar({
               key={item.id}
               type="button"
               className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
+              aria-label={`${item.label}: ${item.sublabel}`}
+              aria-current={isActive ? 'page' : undefined}
+              title={`${item.label}: ${item.sublabel}`}
               onClick={() => onNavigate(item.id)}
             >
               <div className="nav-item-icon">{item.icon}</div>

@@ -63,7 +63,13 @@ function Header({
     return () => clearInterval(interval);
   }, []);
 
-  const meta = PAGE_META[currentPage] || PAGE_META.dashboard;
+  const meta = user?.role === 'citizen' && currentPage === 'dashboard'
+    ? { title: 'Your reports and neighborhood', subtitle: 'Track the civic issues you have reported', sector: 'CITIZEN PORTAL' }
+    : user?.role === 'citizen' && currentPage === 'issues'
+      ? { title: 'My reports', subtitle: 'Review the reports submitted from your account', sector: 'CITIZEN PORTAL' }
+    : user?.role === 'citizen' && currentPage === 'report'
+      ? { title: 'Report a civic issue', subtitle: 'Share a local infrastructure concern', sector: 'CITIZEN PORTAL' }
+      : PAGE_META[currentPage] || PAGE_META.dashboard;
 
   return (
     <header className="app-header">
@@ -74,6 +80,7 @@ function Header({
             {meta.sector}
           </span>
           <h1 className="header-title">{meta.title}</h1>
+          <p className="header-subtitle">{meta.subtitle}</p>
         </div>
       </div>
 
@@ -96,15 +103,17 @@ function Header({
         </div>
 
         {/* ALERTS BADGE SHORTCUT */}
-        <button
-          type="button"
-          className={`header-alert-btn ${activeAlertCount > 0 ? 'has-alerts' : ''}`}
-          onClick={() => onNavigate('alerts')}
-          title="View active infrastructure alerts"
-        >
-          <IconAlerts size={16} />
-          <span>{activeAlertCount} Active</span>
-        </button>
+        {user?.role === 'admin' && (
+          <button
+            type="button"
+            className={`header-alert-btn ${activeAlertCount > 0 ? 'has-alerts' : ''}`}
+            onClick={() => onNavigate('alerts')}
+            title="View active infrastructure alerts"
+          >
+            <IconAlerts size={16} />
+            <span>{activeAlertCount} Active</span>
+          </button>
+        )}
 
         {/* REFRESH BUTTON */}
         <button

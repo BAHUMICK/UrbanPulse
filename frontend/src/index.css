@@ -5,31 +5,36 @@
 
 :root {
   /* Surface & Backgrounds */
-  --bg-app: #0a111c;
-  --bg-sidebar: #0a1320;
-  --bg-header: #101b2a;
-  --bg-card: #121e2e;
-  --bg-card-hover: #17283b;
-  --bg-card-inner: #0c1624;
-  --bg-input: #0c1725;
+  --bg-app: #0d1211;
+  --bg-sidebar: #0b1211;
+  --bg-header: #121a18;
+  --bg-card: #151f1d;
+  --bg-card-hover: #1b2926;
+  --bg-card-inner: #101816;
+  --bg-input: #101917;
 
   /* Borders & Dividers */
-  --border-subtle: #202f43;
-  --border-card: #293b52;
-  --border-card-hover: #38516c;
-  --border-focus: #2dd4bf;
+  --border-subtle: #263531;
+  --border-card: #30433d;
+  --border-card-hover: #405b50;
+  --border-focus: #34d399;
 
   /* Typography Colors */
   --text-primary: #f8fafc;
-  --text-secondary: #a9b7c9;
-  --text-muted: #8293aa;
-  --text-dim: #6d8098;
+  --text-secondary: #b8c5c1;
+  --text-muted: #8c9c97;
+  --text-dim: #71827c;
+
+  --font-ui: "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --shadow-surface: 0 12px 30px rgba(0, 0, 0, 0.18);
 
   /* Accent Colors */
-  --accent-primary: #14a99a;
-  --accent-hover: #11887f;
-  --accent-cyan: #66d9d0;
-  --accent-glow: rgba(45, 212, 191, 0.16);
+  --accent-primary: #10b981;
+  --accent-hover: #059669;
+  --accent-cyan: #22d3ee;
+  --accent-glow: rgba(16, 185, 129, 0.16);
 
   /* Semantic Severity Colors */
   --color-critical: #ef4444;
@@ -96,11 +101,11 @@ body,
 }
 
 body {
-  font-family: "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+  font-family: var(--font-ui);
   background: radial-gradient(ellipse at 78% 0%, rgba(31, 76, 84, 0.12), transparent 36%), var(--bg-app);
   color: var(--text-primary);
   font-size: 13.5px;
-  line-height: 1.5;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -145,7 +150,7 @@ a {
 
 ::selection {
   color: #f5fffe;
-  background: rgba(20, 169, 154, 0.4);
+  background: rgba(16, 185, 129, 0.38);
 }
 
 :where(button, a, input, select, textarea, [tabindex]):focus-visible {
