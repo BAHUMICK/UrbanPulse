@@ -1,6 +1,16 @@
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 export const API_ORIGIN = API_URL.replace(/\/api$/, '');
 export const getMediaUrl = (filePath) => filePath?.startsWith('http') ? filePath : `${API_ORIGIN}${filePath || ''}`;
+let csrfToken = '';
+
+async function ensureCsrfToken() {
+  if (csrfToken) return csrfToken;
+  const response = await fetch(`${API_URL}/auth/csrf`, { credentials: 'include' });
+  const result = await response.json();
+  if (!response.ok || !result?.token) throw new Error(result?.message || 'Unable to verify request.');
+  csrfToken = result.token;
+  return csrfToken;
+}
 
 // =====================================================
 // URBANPULSE CIVIC SERVICE SECTORS
@@ -58,17 +68,20 @@ export const CATEGORY_TO_SECTOR = {
 // =====================================================
 
 async function request(endpoint, options = {}) {
+  const { quiet = false, ...fetchOptions } = options;
   try {
-    const isFormData = options.body instanceof FormData;
-
+    const isFormData = fetchOptions.body instanceof FormData;
+    const method = String(fetchOptions.method || 'GET').toUpperCase();
     const headers = {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-      ...(options.headers || {}),
+      ...(fetchOptions.headers || {}),
     };
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) headers['X-CSRF-Token'] = await ensureCsrfToken();
 
     const response = await fetch(`${API_URL}${endpoint}`, {
-      ...options,
+      ...fetchOptions,
       headers,
+      credentials: 'include',
     });
 
     let result;
@@ -82,22 +95,44 @@ async function request(endpoint, options = {}) {
     }
 
     if (!response.ok) {
-      throw new Error(
+      const error = new Error(
         result?.message ||
           result?.error ||
           `API request failed with status ${response.status}`
       );
+      error.status = response.status;
+      if (response.status === 401 && !['/auth/me', '/auth/login', '/auth/register'].includes(endpoint)) {
+        window.dispatchEvent(new Event('urbanpulse:session-expired'));
+      }
+      throw error;
     }
 
     return result;
   } catch (error) {
-    console.error(
-      `UrbanPulse API error [${endpoint}]:`,
-      error
-    );
+    if (!quiet) console.error(`UrbanPulse API error [${endpoint}]:`, error);
 
     throw error;
   }
+}
+
+export async function getCurrentUser() {
+  const result = await request('/auth/me', { quiet: true });
+  return result?.data || null;
+}
+
+export async function registerAccount(email, password) {
+  const result = await request('/auth/register', { method: 'POST', body: JSON.stringify({ email, password }) });
+  return result.data;
+}
+
+export async function loginAccount(email, password) {
+  const result = await request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+  return result.data;
+}
+
+export async function logoutAccount() {
+  await request('/auth/logout', { method: 'POST', body: JSON.stringify({}) });
+  return true;
 }
 
 // =====================================================

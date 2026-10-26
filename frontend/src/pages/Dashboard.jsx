@@ -7,6 +7,7 @@ import {
   getPriorityIssues,
 } from '../services/api';
 import { SeverityBadge, StatusBadge, ImpactBadge, SectorBadge } from '../components/Badges';
+import { getDashboardMetrics } from './dashboardMetrics';
 import {
   IconAlertTriangle,
   IconShield,
@@ -18,7 +19,7 @@ import {
   IconRefresh,
 } from '../components/Icons';
 
-function Dashboard({ onNavigate, onTelemetryUpdate }) {
+function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
   const [issues, setIssues] = useState([]);
   const [priorityIssues, setPriorityIssues] = useState([]);
   const [impactIssues, setImpactIssues] = useState([]);
@@ -73,18 +74,10 @@ function Dashboard({ onNavigate, onTelemetryUpdate }) {
   }
 
   // Calculated metrics
-  const total = issues.length;
-  const critical = issues.filter((i) => i.severity === 'Critical').length;
-  const high = issues.filter((i) => i.severity === 'High').length;
-  const reported = issues.filter((i) => i.status === 'Reported').length;
-  const inProgress = issues.filter((i) => i.status === 'In Progress').length;
-  const resolved = issues.filter((i) => i.status === 'Resolved').length;
-  const activeCount = reported + inProgress;
-  const resolutionRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
-  const highPriorityTotal = critical + high;
+  const { total, critical, high, reported, inProgress, resolved, activeCount, resolutionRate, highPriorityTotal } = getDashboardMetrics(issues);
 
   const topPriorityList = useMemo(() => {
-    return priorityIssues.slice(0, 5);
+    return priorityIssues.filter((issue) => issue.status !== 'Resolved').slice(0, 5);
   }, [priorityIssues]);
 
   const recentIssues = useMemo(() => {
@@ -395,7 +388,7 @@ function Dashboard({ onNavigate, onTelemetryUpdate }) {
                       <div className="alert-actions-row">
                         <StatusBadge status={alert.status} size="small" />
 
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        {isAdmin && <div style={{ display: 'flex', gap: 6 }}>
                           {alert.status === 'Active' && (
                             <button
                               type="button"
@@ -414,7 +407,7 @@ function Dashboard({ onNavigate, onTelemetryUpdate }) {
                           >
                             {updatingAlertId === alert.id ? '...' : 'Resolve'}
                           </button>
-                        </div>
+                        </div>}
                       </div>
                     </div>
                   ))}

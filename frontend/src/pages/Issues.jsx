@@ -28,7 +28,7 @@ import {
   IconShield,
 } from '../components/Icons';
 
-function Issues({ onNavigate }) {
+function Issues({ onNavigate, isAdmin = false }) {
   const [searchParams] = useSearchParams();
 
   const [issues, setIssues] = useState([]);
@@ -389,7 +389,10 @@ function Issues({ onNavigate }) {
                       <td>
                         <div
                           className="td-title-bold clickable-title"
+                          role="button"
+                          tabIndex={0}
                           onClick={() => setInspectIssue(issue)}
+                          onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setInspectIssue(issue); } }}
                           title="Click to inspect full details and evidence"
                         >
                           {issue.title}
@@ -431,7 +434,7 @@ function Issues({ onNavigate }) {
 
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <select
+                          {isAdmin ? <select
                             className="status-dropdown"
                             value={issue.status}
                             disabled={updatingIssueId === issue.id}
@@ -440,7 +443,7 @@ function Issues({ onNavigate }) {
                             <option value="Reported">Reported</option>
                             <option value="In Progress">In Progress</option>
                             <option value="Resolved">Resolved</option>
-                          </select>
+                          </select> : <StatusBadge status={issue.status} size="small" />}
                           {updatingIssueId === issue.id && (
                             <span style={{ fontSize: '10px', color: 'var(--accent-cyan)' }}>...</span>
                           )}
@@ -655,7 +658,7 @@ function Issues({ onNavigate }) {
             <div className="modal-footer">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>Status:</span>
-                <select
+                {isAdmin && <select
                   className="status-dropdown"
                   value={inspectIssue.status}
                   disabled={updatingIssueId === inspectIssue.id}
@@ -664,7 +667,7 @@ function Issues({ onNavigate }) {
                   <option value="Reported">Reported</option>
                   <option value="In Progress">In Progress</option>
                   <option value="Resolved">Resolved</option>
-                </select>
+                </select>}
               </div>
 
               <button

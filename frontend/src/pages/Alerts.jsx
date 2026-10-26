@@ -12,7 +12,7 @@ import {
 const displayAlertMessage = (message = '') =>
   message.replace(/Automated dispatch assigned to/gi, 'In-app alert assigned to');
 
-function Alerts({ onAlertUpdated, onNavigate }) {
+function Alerts({ onAlertUpdated, onNavigate, isAdmin = false }) {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -276,6 +276,7 @@ function Alerts({ onAlertUpdated, onNavigate }) {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {isAdmin && <>
                       <select
                         className="status-dropdown"
                         value={alert.status}
@@ -308,6 +309,7 @@ function Alerts({ onAlertUpdated, onNavigate }) {
                           Resolve
                         </button>
                       )}
+                      </>}
                     </div>
                   </div>
                 </div>

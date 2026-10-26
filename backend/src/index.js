@@ -8,9 +8,12 @@ const healthRoutes = require('./routes/healthRoutes');
 const issueRoutes = require('./routes/issueRoutes');
 const intelligenceRoutes = require('./routes/intelligenceRoutes');
 const alertRoutes = require('./routes/alertRoutes');
+const authRoutes = require('./routes/authRoutes');
+const { csrfProtection } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 
 // Core Middlewares
 const defaultOrigins = process.env.NODE_ENV === 'production'
@@ -22,7 +25,8 @@ app.use(cors({
   origin(origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error('Origin is not allowed by CORS'));
-  }
+  },
+  credentials: true,
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -31,6 +35,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(uploadDir));
 
 // API Routes
+app.use('/api/auth', csrfProtection, authRoutes);
+app.use('/api', csrfProtection);
 app.use('/api', healthRoutes);
 app.use('/api', issueRoutes);
 app.use('/api', intelligenceRoutes);
@@ -61,11 +67,11 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start Express server
-const server = app.listen(PORT, () => {
-  console.log(
-    `UrbanPulse backend server is running on http://localhost:${PORT}`
-  );
-});
+// Start the HTTP server only when launched directly; tests can import the app.
+const server = require.main === module
+  ? app.listen(PORT, () => {
+    console.log(`UrbanPulse backend server is running on http://localhost:${PORT}`);
+  })
+  : null;
 
 module.exports = { app, server };

@@ -7,7 +7,6 @@ import {
 } from '../services/api';
 import {
   IconReport,
-  IconMapPin,
   IconAlertTriangle,
   IconCheckCircle,
   IconUpload,
@@ -16,6 +15,7 @@ import {
   IconClose,
   IconSector,
 } from '../components/Icons';
+import LocationPicker from '../components/LocationPicker';
 
 const INITIAL_FORM = {
   sector: 'Roads & Transportation',
@@ -25,18 +25,9 @@ const INITIAL_FORM = {
   latitude: '',
   longitude: '',
   severity: 'High',
-  status: 'Reported',
 };
 
 const SEVERITIES = ['Low', 'Medium', 'High', 'Critical'];
-
-// Metro coordinates presets for live demo & presentation
-const DEMO_PRESETS = [
-  { label: 'Sector 5 IT Corridor', lat: '22.580210', lng: '88.431250' },
-  { label: 'EM Bypass Junction', lat: '22.565430', lng: '88.352100' },
-  { label: 'Salt Lake Gate 3', lat: '22.572450', lng: '88.421890' },
-  { label: 'New Town Expressway', lat: '22.591200', lng: '88.468900' },
-];
 
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
@@ -117,14 +108,6 @@ function ReportIssue({ onIssueCreated }) {
       category: cats[0] || 'Other',
     }));
     setErrorMsg('');
-  }
-
-  function applyPreset(preset) {
-    setForm((prev) => ({
-      ...prev,
-      latitude: preset.lat,
-      longitude: preset.lng,
-    }));
   }
 
   function handleFileSelect(e) {
@@ -222,10 +205,9 @@ function ReportIssue({ onIssueCreated }) {
         title: form.title.trim(),
         category: form.category,
         description: form.description.trim(),
-        latitude: parseFloat(form.latitude),
-        longitude: parseFloat(form.longitude),
+        latitude: Number(Number(form.latitude).toFixed(6)),
+        longitude: Number(Number(form.longitude).toFixed(6)),
         severity: form.severity,
-        status: form.status,
       };
 
       const files = evidenceFile ? [evidenceFile] : [];
@@ -348,9 +330,8 @@ function ReportIssue({ onIssueCreated }) {
                   />
                 </div>
 
-                {/* 4. SEVERITY & STATUS */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div className="form-group-custom">
+                {/* 4. SEVERITY */}
+                <div className="form-group-custom">
                     <label className="form-label" htmlFor="inp-sev">
                       Severity Level *
                     </label>
@@ -367,23 +348,6 @@ function ReportIssue({ onIssueCreated }) {
                         </option>
                       ))}
                     </select>
-                  </div>
-
-                  <div className="form-group-custom">
-                    <label className="form-label" htmlFor="inp-stat">
-                      Initial Status
-                    </label>
-                    <select
-                      id="inp-stat"
-                      name="status"
-                      className="form-select-custom"
-                      value={form.status}
-                      onChange={handleChange}
-                    >
-                      <option value="Reported">Reported</option>
-                      <option value="In Progress">In Progress</option>
-                    </select>
-                  </div>
                 </div>
 
                 {/* 5. DESCRIPTION */}
@@ -404,62 +368,9 @@ function ReportIssue({ onIssueCreated }) {
                 </div>
               </div>
 
-              {/* RIGHT COLUMN: LOCATION COORDINATES & EVIDENCE / PROOF UPLOAD */}
+              {/* RIGHT COLUMN: LOCATION PICKER & EVIDENCE / PROOF UPLOAD */}
               <div>
-                {/* LOCATION COORDINATES */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div className="form-group-custom">
-                    <label className="form-label" htmlFor="inp-lat">
-                      Latitude (DD) *
-                    </label>
-                    <input
-                      id="inp-lat"
-                      type="text"
-                      name="latitude"
-                      className="form-input-custom"
-                      placeholder="e.g. 22.580210"
-                      value={form.latitude}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group-custom">
-                    <label className="form-label" htmlFor="inp-lng">
-                      Longitude (DD) *
-                    </label>
-                    <input
-                      id="inp-lng"
-                      type="text"
-                      name="longitude"
-                      className="form-input-custom"
-                      placeholder="e.g. 88.431250"
-                      value={form.longitude}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* PRESENTATION DEMO PRESETS */}
-                <div style={{ marginBottom: 16 }}>
-                  <label className="form-label" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    <IconMapPin size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
-                    Quick Coordinates Presets (For Live Presentation Demo):
-                  </label>
-                  <div className="presets-container">
-                    {DEMO_PRESETS.map((p) => (
-                      <button
-                        key={p.label}
-                        type="button"
-                        className="preset-chip"
-                        onClick={() => applyPreset(p)}
-                      >
-                        📍 {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <LocationPicker latitude={form.latitude} longitude={form.longitude} onChange={(point) => setForm((prev) => ({ ...prev, ...point }))} />
 
                 {/* ===================================================== */}
                 {/* EVIDENCE / PROOF UPLOAD SECTION */}
@@ -488,7 +399,11 @@ function ReportIssue({ onIssueCreated }) {
                   {!evidenceFile ? (
                     <div
                       className="evidence-dropzone"
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Choose an optional evidence photo or video"
                       onClick={() => fileInputRef.current?.click()}
+                      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); fileInputRef.current?.click(); } }}
                     >
                       <div className="dropzone-icon-wrap">
                         <IconUpload size={22} />

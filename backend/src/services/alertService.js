@@ -1,6 +1,10 @@
 const pool = require('../config/db');
 const { calculatePriorityScore } = require('./priorityService');
 
+function isAlertEligible(issue, score) {
+  return issue.status !== 'Resolved' && !(score < 55 && !['High', 'Critical'].includes(issue.severity));
+}
+
 const generateAlertForIssue = async (issue) => {
   const client = await pool.connect();
   try {
@@ -40,7 +44,7 @@ const generateAlertForIssue = async (issue) => {
 
   const allIssuesResult = await client.query('SELECT id, latitude, longitude, severity, status, category FROM issues');
   const score = calculatePriorityScore(issue, allIssuesResult.rows).totalScore;
-  if (issue.status === 'Resolved' || (score < 55 && !['High', 'Critical'].includes(issue.severity))) {
+  if (!isAlertEligible(issue, score)) {
     await client.query('COMMIT');
     return null;
   }
@@ -179,5 +183,6 @@ const generateAlertForIssue = async (issue) => {
 };
 
 module.exports = {
-  generateAlertForIssue
+  generateAlertForIssue,
+  isAlertEligible
 };

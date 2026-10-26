@@ -46,6 +46,8 @@ function Header({
   refreshing = false,
   activeAlertCount = 0,
   systemOnline = true,
+  user,
+  onLogout,
 }) {
   const [currentTime, setCurrentTime] = useState('');
 
@@ -76,6 +78,11 @@ function Header({
       </div>
 
       <div className="header-right">
+        <div className="header-account" title={user?.email}>
+          <span className="header-account-name">{user?.email}</span>
+          <span className="header-account-role">{user?.role === 'admin' ? 'Administrator' : 'Citizen'}</span>
+          <button type="button" className="header-logout" onClick={onLogout}>Sign out</button>
+        </div>
         {/* TIME TELEMETRY */}
         <div className="header-clock-pill">
           <span className="clock-pulse" />

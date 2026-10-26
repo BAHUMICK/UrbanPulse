@@ -4,6 +4,7 @@ const path = require('path');
 
 const router = express.Router();
 const { upload, uploadDir } = require('../config/upload');
+const { authenticate, requireRole } = require('../middleware/auth');
 
 async function hasValidSignature(file) {
   const handle = await fs.open(file.path, 'r');
@@ -71,11 +72,13 @@ router.get('/issues', getAllIssues);
 router.get('/issues/:id', getIssueById);
 
 // POST /api/issues (accepts JSON or multipart/form-data with optional evidence files)
-router.post('/issues', handleEvidenceUpload, createIssue);
+router.post('/issues', authenticate, requireRole('citizen', 'admin'), handleEvidenceUpload, createIssue);
 
 // PUT /api/issues/:id/status
 router.put(
   '/issues/:id/status',
+  authenticate,
+  requireRole('admin'),
   updateIssueStatus
 );
 

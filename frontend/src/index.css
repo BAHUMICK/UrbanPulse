@@ -63,6 +63,22 @@
   --header-height: 56px;
 }
 
+/* Accessible location selection map used by the issue report flow. */
+.location-picker { margin: 0 0 18px; padding: 14px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg-card-inner); }
+.location-picker-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; color: var(--text-primary); }
+.location-picker-heading p { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; }
+.location-picker-map { width: 100%; height: 270px; border-radius: 8px; z-index: 0; }
+.location-picker .leaflet-container { background: #111d2b; }
+.location-picker-marker { background: transparent; border: 0; }
+.location-picker-marker span { display: block; width: 18px; height: 18px; border: 3px solid white; border-radius: 50% 50% 50% 0; background: #14a99a; box-shadow: 0 1px 8px #0009; transform: rotate(-45deg); }
+.location-coordinates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.location-coordinates label { display: grid; gap: 5px; color: var(--text-muted); font-size: 11px; }
+.location-coordinates input { min-width: 0; width: 100%; padding: 8px 10px; border: 1px solid var(--border-subtle); border-radius: 6px; background: var(--bg-input); color: var(--text-primary); }
+.location-selected { margin: 8px 0 0; color: var(--text-secondary); font-size: 11px; }
+.location-reset { border: 1px solid var(--border-subtle); border-radius: 6px; padding: 6px 9px; color: var(--text-secondary); background: var(--bg-card); cursor: pointer; }
+.location-picker :focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+@media (max-width: 640px) { .location-picker { padding: 10px; } .location-picker-map { height: 220px; } }
+
 * {
   box-sizing: border-box;
   margin: 0;

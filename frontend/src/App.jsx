@@ -11,7 +11,8 @@ import Analytics from './pages/Analytics';
 import Alerts from './pages/Alerts';
 import MapView from './components/MapView';
 
-import { getIssues, getActiveAlerts, checkBackendHealth } from './services/api';
+import { getIssues, getActiveAlerts, checkBackendHealth, getCurrentUser, logoutAccount } from './services/api';
+import AuthPage from './pages/AuthPage';
 import './App.css';
 
 function App() {
@@ -29,6 +30,29 @@ function App() {
   const [systemOnline, setSystemOnline] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const authPage = path === 'login' || path === 'register';
+
+  useEffect(() => {
+    let mounted = true;
+    getCurrentUser().then((current) => { if (mounted) setUser(current); })
+      .catch(() => { if (mounted) setUser(null); })
+      .finally(() => { if (mounted) setAuthLoading(false); });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    const expireSession = () => { setUser(null); navigate('/login', { replace: true }); };
+    window.addEventListener('urbanpulse:session-expired', expireSession);
+    return () => window.removeEventListener('urbanpulse:session-expired', expireSession);
+  }, [navigate]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user && !authPage) navigate('/login', { replace: true });
+    else if (user && authPage) navigate('/dashboard', { replace: true });
+  }, [authLoading, user, authPage, navigate]);
 
   // Load telemetry stats for sidebar and header counters
   const fetchTelemetry = useCallback(async () => {
@@ -71,6 +95,15 @@ function App() {
     setRefreshKey((prev) => prev + 1);
   }
 
+  async function handleLogout() {
+    try { await logoutAccount(); } catch (error) { console.error('Sign-out request failed:', error.message); }
+    setUser(null);
+    navigate('/login', { replace: true });
+  }
+
+  if (authLoading) return <main className="auth-loading" role="status">Loading UrbanPulse…</main>;
+  if (!user) return <AuthPage onAuthenticated={(nextUser) => { setUser(nextUser); navigate('/dashboard', { replace: true }); }} />;
+
   function renderPage() {
     switch (currentPage) {
       case 'dashboard':
@@ -79,12 +112,13 @@ function App() {
             key={refreshKey}
             onNavigate={handleNavigate}
             onTelemetryUpdate={fetchTelemetry}
+            isAdmin={user.role === 'admin'}
           />
         );
       case 'map':
         return <MapView key={refreshKey} onNavigate={handleNavigate} />;
       case 'issues':
-        return <Issues key={refreshKey} onNavigate={handleNavigate} />;
+        return <Issues key={refreshKey} onNavigate={handleNavigate} isAdmin={user.role === 'admin'} />;
       case 'report':
         return (
           <ReportIssue
@@ -101,6 +135,7 @@ function App() {
             key={refreshKey}
             onAlertUpdated={fetchTelemetry}
             onNavigate={handleNavigate}
+            isAdmin={user.role === 'admin'}
           />
         );
       case 'analytics':
@@ -119,6 +154,8 @@ function App() {
         activeAlertCount={activeAlertCount}
         totalIssuesCount={totalIssuesCount}
         systemOnline={systemOnline}
+        user={user}
+        onLogout={handleLogout}
       />
 
       {/* MAIN COMMAND LAYOUT */}
@@ -131,6 +168,8 @@ function App() {
           refreshing={refreshing}
           activeAlertCount={activeAlertCount}
           systemOnline={systemOnline}
+          user={user}
+          onLogout={handleLogout}
         />
 
         {/* PAGE CONTENT CONTAINER (SCROLLABLE) */}

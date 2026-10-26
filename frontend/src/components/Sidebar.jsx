@@ -16,46 +16,48 @@ function Sidebar({
   activeAlertCount = 0,
   totalIssuesCount = 0,
   systemOnline = true,
+  user,
+  onLogout,
 }) {
   const navItems = [
     {
       id: 'dashboard',
-      label: 'Command Center',
-      sublabel: 'Overview & KPIs',
+      label: 'Dashboard',
+      sublabel: 'City at a glance',
       icon: <IconDashboard size={18} />,
     },
     {
       id: 'map',
-      label: 'Map Intelligence',
-      sublabel: 'Spatial Clusters',
+      label: 'Map',
+      sublabel: 'Issue locations',
       icon: <IconMap size={18} />,
     },
     {
       id: 'issues',
-      label: 'Incident Center',
-      sublabel: 'Triage & Status',
+      label: 'Issues',
+      sublabel: 'Browse reports',
       icon: <IconIssues size={18} />,
       badge: totalIssuesCount > 0 ? totalIssuesCount : null,
       badgeType: 'neutral',
     },
     {
       id: 'report',
-      label: 'Report Anomaly',
-      sublabel: 'Issue Report Intake',
+      label: 'Report issue',
+      sublabel: 'Submit a civic concern',
       icon: <IconReport size={18} />,
     },
     {
       id: 'alerts',
-      label: 'Municipal Alerts',
-      sublabel: 'In-App Alert Lifecycle',
+      label: 'Alerts',
+      sublabel: 'Needs attention',
       icon: <IconAlerts size={18} />,
       badge: activeAlertCount > 0 ? activeAlertCount : null,
       badgeType: 'critical',
     },
     {
       id: 'analytics',
-      label: 'Impact Analytics',
-      sublabel: 'Severity & Trends',
+      label: 'Analytics',
+      sublabel: 'Patterns & impact',
       icon: <IconAnalytics size={18} />,
     },
   ];
@@ -120,9 +122,9 @@ function Sidebar({
 
           <div className="telemetry-row">
             <span className="telemetry-label">PostgreSQL</span>
-            <span className="telemetry-val">
+            <span className="telemetry-val" title="Database reachability is included in the API health check">
               <IconDatabase size={11} style={{ marginRight: 3, verticalAlign: -1 }} />
-              18.4 Running
+              {systemOnline ? 'Connected' : 'Unavailable'}
             </span>
           </div>
         </div>

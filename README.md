@@ -570,3 +570,45 @@ To maintain transparency and academic rigor, the following scope boundaries appl
 - **Project Type:** Final-Year Undergraduate Software Engineering Project
 - **Repository Path:** `D:\UrbanPulse`
 - **License:** For Academic & Educational Demonstration Use
+# Authentication setup (additive)
+
+The API stores citizen accounts in `app_users` and opaque session-token hashes in
+`auth_sessions`. Passwords are hashed with Node.js scrypt. Session cookies are
+HttpOnly and expire after seven days; unsafe API requests also require a signed
+CSRF header. Public registration always creates the `citizen` role. Issue status
+and alert status changes require an administrator on the server.
+
+Before enabling authentication, take a normal database backup and apply
+`database/migrations/001_authentication.sql` to the UrbanPulse database. This is
+additive and does not modify the existing issues, alerts, or evidence tables.
+Do not run the sample-data section of `database/schema.sql` as a production
+migration.
+
+Set `AUTH_SECRET` in the backend environment to a newly generated random value
+of at least 32 bytes. For example, locally run
+`node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
+and copy the result into the private environment configuration; never commit it.
+Set `CORS_ORIGINS` to the exact frontend origin(s). In production, HTTPS is
+required for the secure session cookie. The existing Vercel `/api` rewrite
+keeps browser requests on the frontend origin; leave `VITE_API_URL` empty in
+Vercel so session cookies remain first-party. Keep the rewrite target aligned
+with the Render API hostname.
+
+To provision the first administrator, register a normal citizen account, then
+have a trusted database operator run the following for that exact address:
+
+```sql
+UPDATE app_users SET role = 'admin' WHERE LOWER(email) = LOWER('admin@example.com');
+```
+
+No administrator password or account is seeded by the application. A role
+submitted by a browser is ignored.
+
+For local development, apply the migration to the local development database,
+set `AUTH_SECRET` in `backend/.env`, run the backend and frontend, then register
+at `/register`. For deployment, apply the migration first, configure
+`AUTH_SECRET` and `CORS_ORIGINS` on Render, leave `VITE_API_URL` unset on Vercel
+to use the same-origin rewrite, build/deploy the frontend, and provision an
+administrator only if the deployment requires one. Verify login and cookie
+behavior in the deployed browser before announcing the release. Never use the
+production database for development seed scripts.

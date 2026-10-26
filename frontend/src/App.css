@@ -2404,3 +2404,105 @@ button:disabled {
     gap: 8px;
   }
 }
+
+/* Shared account screens and responsive command-center refinements. */
+.auth-screen, .auth-loading { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: radial-gradient(ellipse at 80% 0, rgba(31, 91, 96, .2), transparent 46%), var(--bg-app); color: var(--text-primary); }
+.auth-loading { font-size: 14px; color: var(--text-secondary); }
+.auth-card { width: min(100%, 430px); padding: clamp(24px, 5vw, 40px); border: 1px solid var(--border-card); border-radius: 16px; background: rgba(18, 30, 46, .96); box-shadow: 0 24px 70px rgba(0,0,0,.32); }
+.auth-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; }
+.auth-brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--accent-primary); color: #fff; font-size: 13px; }
+.auth-eyebrow { margin: 28px 0 8px; color: var(--accent-cyan); font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+.auth-card h1 { margin: 0; font-size: clamp(23px, 5vw, 29px); letter-spacing: -.03em; }
+.auth-intro { margin: 9px 0 23px; color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
+.auth-form { display: grid; gap: 9px; }
+.auth-form label { margin-top: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+.auth-form input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border-card); border-radius: 8px; background: var(--bg-input); color: var(--text-primary); }
+.auth-form input:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.auth-hint { margin: 0; color: var(--text-muted); font-size: 11px; }
+.auth-submit { min-height: 45px; margin-top: 12px; border: 0; border-radius: 8px; background: var(--accent-primary); color: white; font-weight: 700; cursor: pointer; }
+.auth-submit:hover { background: var(--accent-hover); }
+.auth-submit:disabled { opacity: .65; cursor: wait; }
+.auth-error { margin: 12px 0; padding: 10px 12px; border: 1px solid rgba(248,113,113,.35); border-radius: 8px; background: rgba(127,29,29,.2); color: #fecaca; font-size: 12px; }
+.auth-switch { margin: 20px 0 0; color: var(--text-muted); font-size: 12px; text-align: center; }
+.auth-switch a { color: var(--accent-cyan); font-weight: 700; }
+.header-account { display: flex; align-items: center; gap: 8px; padding-left: 8px; }
+.header-account-name { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: 11px; }
+.header-account-role { color: var(--text-muted); font-size: 10px; }
+.header-logout { border: 1px solid var(--border-card); border-radius: 6px; padding: 6px 9px; background: var(--bg-card-inner); color: var(--text-secondary); cursor: pointer; font-size: 11px; }
+.header-logout:hover { color: var(--text-primary); border-color: var(--border-focus); }
+.app-header { gap: 12px; }
+.header-title { font-size: clamp(14px, 1.3vw, 19px); letter-spacing: -.02em; }
+.intel-card { border-radius: 10px; box-shadow: 0 5px 18px rgba(0,0,0,.12); }
+.intel-card-header { padding: 14px 16px; }
+.intel-header-title { font-size: 14px; letter-spacing: -.01em; }
+.intel-header-sub { font-size: 11px; line-height: 1.5; }
+.table-panel { overflow: hidden; }
+.table-scroll-container { overflow-x: auto; overscroll-behavior-inline: contain; }
+button, select, input, textarea { font: inherit; }
+button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+@media (max-width: 800px) {
+  .app-header { min-height: 60px; height: auto; }
+  .header-status-pill, .header-clock-pill { display: none; }
+  .header-account-name { max-width: 110px; }
+  .app-content-body { min-width: 0; }
+  .table-panel, .intel-card { min-width: 0; }
+  .map-toolbar { flex-wrap: wrap; }
+}
+
+@media (max-width: 640px) {
+  .app-shell { display: flex; flex-direction: column; width: 100%; height: 100dvh; min-height: 0; }
+  .app-main-layout { order: 1; width: 100%; min-width: 0; height: calc(100dvh - 62px); }
+  .app-sidebar { order: 2; width: 100%; min-width: 0; max-width: none; height: 62px; min-height: 62px; flex: 0 0 62px; border-top: 1px solid var(--border-card); border-right: 0; }
+  .sidebar-brand, .sidebar-section-title, .sidebar-footer { display: none; }
+  .sidebar-nav { display: flex; width: 100%; height: 100%; overflow-x: auto; padding: 4px 5px; gap: 3px; }
+  .sidebar-nav-item { flex: 1 0 68px; min-width: 68px; min-height: 52px; padding: 5px 3px; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+  .sidebar-nav-item .nav-item-text { display: block; text-align: center; }
+  .sidebar-nav-item .nav-item-label { font-size: 9px; line-height: 1.15; white-space: nowrap; }
+  .sidebar-nav-item .nav-item-sub, .sidebar-nav-item .nav-item-badge { display: none; }
+  .nav-item-icon { margin: 0; }
+  .app-header { padding: 8px 10px; }
+  .header-left { min-width: 0; }
+  .header-title { max-width: 52vw; white-space: normal; line-height: 1.15; }
+  .header-sector-tag { display: none; }
+  .header-right { flex-wrap: nowrap; }
+  .header-alert-btn span, .header-refresh-btn span { display: none; }
+  .header-alert-btn, .header-refresh-btn { padding: 8px; }
+  .header-account { gap: 5px; }
+  .header-account-name, .header-account-role { display: none; }
+  .header-logout { padding: 7px; }
+  .app-content-body { padding: 12px 10px 20px; overflow-x: hidden; }
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pipeline-stepper { grid-template-columns: 1fr 1fr; }
+  .table-filter-bar { flex-wrap: wrap; gap: 8px; }
+  .form-two-col { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-split-grid, .analytics-grid-two { grid-template-columns: minmax(0, 1fr); }
+  .table-filter-bar { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+  .table-filter-bar .filter-group-left { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; gap: 8px; }
+  .table-filter-bar .search-input-wrap { width: 100%; }
+  .table-filter-bar .search-input { width: 100%; }
+  .table-filter-bar .filter-selects-wrap { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: 7px; }
+  .table-filter-bar .filter-select { min-width: 0; width: 100%; }
+  .table-filter-bar > div:last-child { display: flex !important; align-items: center; justify-content: space-between; }
+  .table-responsive { overflow-x: visible; }
+  .incident-table { min-width: 0; width: 100%; }
+  .incident-table thead { display: none; }
+  .incident-table tbody tr:not(:has(td[colspan])) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 8px; margin: 8px; padding: 8px; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--bg-card-inner); }
+  .incident-table tbody tr:has(td[colspan]) { display: block; }
+  .incident-table tbody tr:has(td[colspan]) td { display: block; width: 100%; padding: 22px 12px !important; text-align: center; }
+  .incident-table tbody tr:has(td[colspan]) td::before { display: none; }
+  .incident-table td { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 4px; padding: 7px 5px; border: 0; font-size: 11px; overflow-wrap: anywhere; }
+  .incident-table td::before { color: var(--text-muted); font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+  .incident-table td:nth-child(1) { grid-column: 1 / -1; }
+  .incident-table td:nth-child(1)::before { content: 'Issue ID'; }
+  .incident-table td:nth-child(2) { grid-column: 1 / -1; }
+  .incident-table td:nth-child(2)::before { content: 'Issue'; }
+  .incident-table td:nth-child(3)::before { content: 'Service sector'; }
+  .incident-table td:nth-child(4)::before { content: 'Category'; }
+  .incident-table td:nth-child(5)::before { content: 'Severity'; }
+  .incident-table td:nth-child(6)::before { content: 'Priority'; }
+  .incident-table td:nth-child(7)::before { content: 'Evidence'; }
+  .incident-table td:nth-child(8)::before { content: 'Status'; }
+  .incident-table td:nth-child(9) { grid-column: 1 / -1; }
+  .incident-table td:nth-child(9)::before { content: 'Actions'; }
+}
