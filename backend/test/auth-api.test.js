@@ -9,15 +9,21 @@ const testUploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'urbanpulse-auth-tes
 process.env.UPLOAD_DIR = testUploadDir;
 
 const pool = require('../src/config/db');
+const { hashToken } = require('../src/middleware/auth');
 const users = new Map();
 const sessions = new Map();
-let currentIssue = { id: 7, sector: 'Roads & Transportation', title: 'Test road damage', category: 'Road Damage', description: 'Road has a deep pothole', latitude: 22.5, longitude: 88.3, severity: 'High', status: 'Reported', created_at: new Date().toISOString() };
+let currentIssue = { id: 7, sector: 'Roads & Transportation', title: 'Test road damage', category: 'Road Damage', description: 'Road has a deep pothole', latitude: 22.5, longitude: 88.3, severity: 'High', status: 'Reported', reporter_user_id: 99, created_at: new Date().toISOString() };
 let createdIssue;
+const evidencePath = '/uploads/test-private-evidence.png';
 let failNextUserInsert = false;
+let failNextUserInsertCode = null;
 let failNextSessionInsert = false;
+let failNextSessionDelete = false;
+const transactionStats = { clients: 0, commits: 0, rollbacks: 0, releases: 0, discarded: 0 };
 
 pool.query = async (sql, values = []) => {
   const query = sql.replace(/\s+/g, ' ').trim().toLowerCase();
+  if (query.startsWith('select now() as current_time')) return { rows: [{ current_time: new Date().toISOString() }] };
   if (query.startsWith('insert into app_users')) {
     const [email, password_hash] = values;
     if ([...users.values()].some((user) => user.email === email)) { const error = new Error('duplicate'); error.code = '23505'; throw error; }
@@ -38,11 +44,23 @@ pool.query = async (sql, values = []) => {
     const user = session && session.expires_at > new Date() ? users.get(session.user_id) : null;
     return { rows: user ? [{ id: user.id, email: user.email, role: user.role }] : [] };
   }
+  if (query.startsWith('select e.file_path from issue_evidence e')) {
+    const authorized = values[1] || Number(currentIssue.reporter_user_id) === Number(values[2]);
+    return { rows: authorized && values[0] === evidencePath ? [{ file_path: evidencePath }] : [] };
+  }
+  if (query.startsWith('select a.id, a.issue_id')) return { rows: [{ id: 11, issue_id: 7, title: 'Test alert', status: 'Active' }] };
+  if (query.startsWith('select i.id, i.sector')) {
+    const ownerParameter = query.match(/i\.reporter_user_id = \$(\d+)/);
+    const ownerId = ownerParameter ? values[Number(ownerParameter[1]) - 1] : null;
+    const rows = [currentIssue, createdIssue].filter(Boolean).filter((issue) => !ownerParameter || Number(issue.reporter_user_id) === Number(ownerId));
+    const detail = query.includes('where i.id = $1');
+    return { rows: detail ? rows.filter((issue) => Number(issue.id) === Number(values[0])) : rows };
+  }
   if (query.startsWith('delete from auth_sessions where user_id')) return { rows: [] };
-  if (query.startsWith('delete from auth_sessions where token_hash')) { sessions.delete(values[0]); return { rows: [] }; }
+  if (query.startsWith('delete from auth_sessions where token_hash')) { if (failNextSessionDelete) { failNextSessionDelete = false; throw new Error('simulated session revocation failure'); } sessions.delete(values[0]); return { rows: [] }; }
   if (query.startsWith('insert into issues')) {
     const [sector, title, category, description, latitude, longitude, severity] = values;
-    createdIssue = { id: 8, sector, title, category, description, latitude, longitude, severity, status: 'Reported', created_at: new Date().toISOString() };
+    createdIssue = { id: 8, sector, title, category, description, latitude, longitude, severity, status: 'Reported', reporter_user_id: values[7], created_at: new Date().toISOString() };
     return { rows: [{ ...createdIssue }] };
   }
   if (query.startsWith('update issues set status')) { currentIssue = { ...currentIssue, status: values[0] }; return { rows: [{ ...currentIssue }] }; }
@@ -53,19 +71,27 @@ pool.query = async (sql, values = []) => {
   throw new Error(`Unexpected test query: ${query}`);
 };
 pool.connect = async () => {
+  transactionStats.clients += 1;
   let insertedUserId = null;
   const insertedSessionTokens = [];
   return {
   query: async (sql, values = []) => {
     const query = sql.replace(/\s+/g, ' ').trim().toLowerCase();
-    if (query === 'begin' || query === 'commit' || query.startsWith('select pg_advisory_xact_lock')) return { rows: [] };
+    if (query === 'commit') { transactionStats.commits += 1; return { rows: [] }; }
+    if (query === 'begin' || query.startsWith('select pg_advisory_xact_lock')) return { rows: [] };
     if (query === 'rollback') {
+      transactionStats.rollbacks += 1;
       if (insertedUserId !== null) users.delete(insertedUserId);
       for (const tokenHash of insertedSessionTokens) sessions.delete(tokenHash);
       return { rows: [] };
     }
     if (query.startsWith('insert into app_users')) {
-      if (failNextUserInsert) { failNextUserInsert = false; throw new Error('simulated user insert failure'); }
+      if (failNextUserInsert) {
+        failNextUserInsert = false;
+        const error = new Error('simulated user insert failure');
+        if (failNextUserInsertCode) { error.code = failNextUserInsertCode; failNextUserInsertCode = null; }
+        throw error;
+      }
       const [email, password_hash] = values;
       if ([...users.values()].some((user) => user.email.toLowerCase() === email.toLowerCase())) { const error = new Error('duplicate'); error.code = '23505'; throw error; }
       const user = { id: users.size + 1, email, role: 'citizen', password_hash };
@@ -84,7 +110,7 @@ pool.connect = async () => {
     if (query.startsWith('insert into alerts')) return { rows: [{ id: 9, issue_id: values[0], alert_type: values[1], title: values[2], message: values[3], priority_score: values[4], authority: values[5], status: 'Active', created_at: new Date().toISOString() }] };
     throw new Error(`Unexpected test transaction query: ${query}`);
   },
-  release() {},
+  release(error) { transactionStats.releases += 1; if (error) transactionStats.discarded += 1; },
   };
 };
 
@@ -93,10 +119,20 @@ let server;
 let baseUrl;
 
 test('auth API enforces roles and supports citizen sign-in/out and admin workflow', async (t) => {
+  app.set('trust proxy', 1);
   server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
   t.after(async () => { server.closeAllConnections?.(); await new Promise((resolve) => server.close(resolve)); });
+
+  const preflight = await fetch(`${baseUrl}/api/auth/csrf`, { method: 'OPTIONS', headers: { origin: 'https://urbanpulse-three.vercel.app', 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type,x-csrf-token' } });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('access-control-allow-origin'), 'https://urbanpulse-three.vercel.app');
+  assert.equal(preflight.headers.get('access-control-allow-credentials'), 'true');
+  const rejectedOrigin = await fetch(`${baseUrl}/api/health`, { headers: { origin: 'https://untrusted.example' } });
+  assert.equal(rejectedOrigin.status, 403);
+  const health = await fetch(`${baseUrl}/api/health`).then((response) => response.json());
+  assert.equal(health.status, 'UP');
 
   const csrfResult = await fetch(`${baseUrl}/api/auth/csrf`).then((response) => response.json());
   const csrf = csrfResult.token;
@@ -109,15 +145,24 @@ test('auth API enforces roles and supports citizen sign-in/out and admin workflo
 
   const shortPassword = await fetch(`${baseUrl}/api/auth/register`, { method: 'POST', headers: csrfHeaders, body: JSON.stringify({ email: 'citizen@example.com', password: 'short' }) });
   assert.equal(shortPassword.status, 400);
+  const invalidEmail = await fetch(`${baseUrl}/api/auth/register`, { method: 'POST', headers: csrfHeaders, body: JSON.stringify({ email: 'not-an-email', password: 'correct horse battery staple' }) });
+  assert.equal(invalidEmail.status, 400);
 
+  const transactionStart = { ...transactionStats };
   const register = await fetch(`${baseUrl}/api/auth/register`, { method: 'POST', headers: csrfHeaders, body: JSON.stringify({ email: 'citizen@example.com', password: 'correct horse battery staple', role: 'admin' }) });
   assert.equal(register.status, 201);
+  assert.equal(transactionStats.commits - transactionStart.commits, 1);
+  assert.equal(transactionStats.releases - transactionStart.releases, 1);
   const userData = await register.json();
   assert.equal(userData.data.role, 'citizen');
   const citizenCookie = register.headers.get('set-cookie').split(';')[0];
   assert.match(register.headers.get('set-cookie'), /HttpOnly/);
   assert.match(register.headers.get('set-cookie'), /SameSite=Lax/);
-  assert.equal(sessions.has(decodeURIComponent(citizenCookie.split('=')[1])), false);
+  const registrationToken = decodeURIComponent(citizenCookie.split('=')[1]);
+  assert.equal(sessions.has(hashToken(registrationToken)), true);
+  const registrationSession = await fetch(`${baseUrl}/api/auth/me`, { headers: { cookie: citizenCookie } });
+  assert.equal(registrationSession.status, 200);
+  assert.equal((await registrationSession.json()).data.role, 'citizen');
 
   const duplicate = await fetch(`${baseUrl}/api/auth/register`, { method: 'POST', headers: csrfHeaders, body: JSON.stringify({ email: 'citizen@example.com', password: 'correct horse battery staple' }) });
   assert.equal(duplicate.status, 409);
@@ -130,8 +175,12 @@ test('auth API enforces roles and supports citizen sign-in/out and admin workflo
   assert.equal([...users.values()].filter((user) => user.email === 'parallel@example.com').length, 1);
 
   failNextSessionInsert = true;
+  const failedSessionTransactionStart = { ...transactionStats };
   const sessionFailure = await fetch(`${baseUrl}/api/auth/register`, { method: 'POST', headers: csrfHeaders, body: JSON.stringify({ email: 'rollback@example.com', password: 'correct horse battery staple' }) });
   assert.equal(sessionFailure.status, 503);
+  assert.equal(transactionStats.rollbacks - failedSessionTransactionStart.rollbacks, 1);
+  assert.equal(transactionStats.commits - failedSessionTransactionStart.commits, 0);
+  assert.equal(transactionStats.releases - failedSessionTransactionStart.releases, 1);
   assert.equal([...users.values()].some((user) => user.email === 'rollback@example.com'), false);
   assert.equal([...sessions.values()].some((session) => users.get(session.user_id)?.email === 'rollback@example.com'), false);
 
@@ -140,8 +189,18 @@ test('auth API enforces roles and supports citizen sign-in/out and admin workflo
   assert.equal(userFailure.status, 503);
   assert.equal([...users.values()].some((user) => user.email === 'insert-failure@example.com'), false);
 
+  failNextUserInsert = true;
+  failNextUserInsertCode = '42P01';
+  const missingAuthSchema = await fetch(`${baseUrl}/api/auth/register`, { method: 'POST', headers: { ...csrfHeaders, 'x-forwarded-for': '192.0.2.42' }, body: JSON.stringify({ email: 'missing-schema@example.com', password: 'correct horse battery staple' }) });
+  assert.equal(missingAuthSchema.status, 503);
+  assert.match((await missingAuthSchema.json()).message, /verify the intended database and apply database\/migrations\/001_authentication\.sql/i);
+
   const loginInvalid = await fetch(`${baseUrl}/api/auth/login`, { method: 'POST', headers: csrfHeaders, body: JSON.stringify({ email: 'citizen@example.com', password: 'wrong password' }) });
   assert.equal(loginInvalid.status, 401);
+  const citizenAdminLogin = await fetch(`${baseUrl}/api/auth/admin/login`, { method: 'POST', headers: { ...csrfHeaders, 'x-forwarded-for': '192.0.2.43' }, body: JSON.stringify({ email: 'citizen@example.com', password: 'correct horse battery staple' }) });
+  assert.equal(citizenAdminLogin.status, 403);
+  assert.equal((await citizenAdminLogin.json()).message, 'This account is not authorized for administrator access.');
+  assert.equal(citizenAdminLogin.headers.get('set-cookie'), null);
   const login = await fetch(`${baseUrl}/api/auth/login`, { method: 'POST', headers: csrfHeaders, body: JSON.stringify({ email: 'citizen@example.com', password: 'correct horse battery staple' }) });
   assert.equal(login.status, 200);
   const sessionCookie = login.headers.get('set-cookie').split(';')[0];
@@ -151,7 +210,6 @@ test('auth API enforces roles and supports citizen sign-in/out and admin workflo
   assert.equal(missingCookie.status, 401);
   const malformedCookie = await fetch(`${baseUrl}/api/auth/me`, { headers: { cookie: 'urbanpulse_session=%E0%A4%A' } });
   assert.equal(malformedCookie.status, 401);
-  const { hashToken } = require('../src/middleware/auth');
   const expiredToken = 'expired-session-token';
   sessions.set(hashToken(expiredToken), { user_id: 1, expires_at: new Date(Date.now() - 1000) });
   const expiredSession = await fetch(`${baseUrl}/api/auth/me`, { headers: { cookie: `urbanpulse_session=${expiredToken}` } });
@@ -159,6 +217,9 @@ test('auth API enforces roles and supports citizen sign-in/out and admin workflo
 
   const anonymousReport = await fetch(`${baseUrl}/api/issues`, { method: 'POST', headers: csrfHeaders, body: JSON.stringify({ title: 'A pothole here', category: 'Road Damage', description: 'A large pothole creates a risk', latitude: 22.5, longitude: 88.3, severity: 'High' }) });
   assert.equal(anonymousReport.status, 401);
+  assert.equal((await fetch(`${baseUrl}/api/issues`)).status, 401);
+  assert.equal((await fetch(`${baseUrl}/api/alerts/active`, { headers: { cookie: sessionCookie } })).status, 403);
+  assert.equal((await fetch(`${baseUrl}/api/intelligence/priorities`, { headers: { cookie: sessionCookie } })).status, 403);
 
   const unauthorizedForm = new FormData();
   unauthorizedForm.append('evidence', new Blob(['not a real image'], { type: 'image/png' }), 'bad.png');
@@ -182,6 +243,17 @@ test('auth API enforces roles and supports citizen sign-in/out and admin workflo
   assert.equal(Number(createdBody.data.issue.longitude), mapSelectedLongitude);
   assert.equal(createdBody.data.issue.status, 'Reported');
   assert.equal(createdBody.data.alert.status, 'Active');
+  assert.equal(createdIssue.reporter_user_id, 1);
+  const ownReports = await fetch(`${baseUrl}/api/issues`, { headers: { cookie: sessionCookie } }).then((response) => response.json());
+  assert.deepEqual(ownReports.data.map((issue) => issue.id), [8]);
+  const ownIssue = await fetch(`${baseUrl}/api/issues/8`, { headers: { cookie: sessionCookie } });
+  assert.equal(ownIssue.status, 200);
+  assert.equal((await ownIssue.json()).data.id, 8);
+  assert.equal((await fetch(`${baseUrl}/api/issues/7`, { headers: { cookie: sessionCookie } })).status, 404);
+
+  fs.writeFileSync(path.join(testUploadDir, path.basename(evidencePath)), Buffer.from('test-only evidence'));
+  assert.equal((await fetch(`${baseUrl}/api/uploads/${path.basename(evidencePath)}`, { headers: { cookie: sessionCookie } })).status, 404);
+  assert.equal((await fetch(`${baseUrl}/api/uploads/${path.basename(evidencePath)}`)).status, 401);
 
   const noSession = await fetch(`${baseUrl}/api/issues/7/status`, { method: 'PUT', headers: csrfHeaders, body: JSON.stringify({ status: 'In Progress' }) });
   assert.equal(noSession.status, 401);
@@ -192,6 +264,17 @@ test('auth API enforces roles and supports citizen sign-in/out and admin workflo
 
   const user = [...users.values()][0];
   user.role = 'admin'; // Simulate the documented trusted operator provisioning step.
+  const adminLogin = await fetch(`${baseUrl}/api/auth/admin/login`, { method: 'POST', headers: { ...csrfHeaders, 'x-forwarded-for': '192.0.2.44' }, body: JSON.stringify({ email: user.email, password: 'correct horse battery staple' }) });
+  assert.equal(adminLogin.status, 200);
+  assert.equal((await adminLogin.json()).data.role, 'admin');
+  assert.equal((await fetch(`${baseUrl}/api/alerts`, { headers: { cookie: sessionCookie } })).status, 200);
+  assert.equal((await fetch(`${baseUrl}/api/alerts/active`, { headers: { cookie: sessionCookie } })).status, 200);
+  const allReports = await fetch(`${baseUrl}/api/issues`, { headers: { cookie: sessionCookie } }).then((response) => response.json());
+  assert.deepEqual(new Set(allReports.data.map((issue) => issue.id)), new Set([7, 8]));
+  const evidenceResponse = await fetch(`${baseUrl}/api/uploads/${path.basename(evidencePath)}`, { headers: { cookie: sessionCookie } });
+  assert.equal(evidenceResponse.status, 200);
+  assert.equal(evidenceResponse.headers.get('cache-control'), 'private, no-store');
+  assert.equal(await evidenceResponse.text(), 'test-only evidence');
   const adminStatus = await fetch(`${baseUrl}/api/issues/7/status`, { method: 'PUT', headers: { ...csrfHeaders, cookie: sessionCookie }, body: JSON.stringify({ status: 'In Progress' }) });
   assert.equal(adminStatus.status, 200);
   assert.equal((await adminStatus.json()).data.status, 'In Progress');
@@ -201,10 +284,19 @@ test('auth API enforces roles and supports citizen sign-in/out and admin workflo
   assert.equal(resolvedIssue.status, 200);
   assert.equal((await resolvedIssue.json()).data.status, 'Resolved');
 
+  failNextSessionDelete = true;
+  const failedLogout = await fetch(`${baseUrl}/api/auth/logout`, { method: 'POST', headers: { ...csrfHeaders, cookie: sessionCookie }, body: '{}' });
+  assert.equal(failedLogout.status, 503);
+  assert.match(failedLogout.headers.get('set-cookie'), /urbanpulse_session=; Path=\/api/);
+  assert.equal(sessions.has(hashToken(decodeURIComponent(sessionCookie.split('=')[1]))), true);
   const logout = await fetch(`${baseUrl}/api/auth/logout`, { method: 'POST', headers: { ...csrfHeaders, cookie: sessionCookie }, body: '{}' });
   assert.equal(logout.status, 200);
+  assert.match(logout.headers.get('set-cookie'), /urbanpulse_session=; Path=\/api; HttpOnly; SameSite=Lax; Max-Age=0/);
   const afterLogout = await fetch(`${baseUrl}/api/auth/me`, { headers: { cookie: sessionCookie } });
   assert.equal(afterLogout.status, 401);
+  const expiredLogout = await fetch(`${baseUrl}/api/auth/logout`, { method: 'POST', headers: { ...csrfHeaders, cookie: `urbanpulse_session=${expiredToken}` }, body: '{}' });
+  assert.equal(expiredLogout.status, 200);
+  assert.match(expiredLogout.headers.get('set-cookie'), /Max-Age=0/);
 });
 
 test.after(() => {

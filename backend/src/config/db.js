@@ -1,68 +1,178 @@
+const fs = require('fs');
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Determine SSL requirement safely:
-// Enabled if DB_SSL is true, or if connecting to a remote host (via DATABASE_URL or DB_HOST) unless DB_SSL is explicitly 'false'.
-const isExplicitlyDisabled = process.env.DB_SSL === 'false';
-const isExplicitlyEnabled = process.env.DB_SSL === 'true';
+const SECURE_SSL_MODES = new Set(['prefer', 'require', 'verify-ca', 'verify-full']);
 
-let isRemoteHost = false;
-let safeTargetHost = 'localhost';
-let safeTargetPort = 5432;
-let safeTargetDb = 'urbanpulse';
-let connectionMode = 'DISCRETE_PARAMS';
-
-if (process.env.DATABASE_URL) {
-  connectionMode = 'DATABASE_URL';
+function readPemFile(filePath, description) {
   try {
-    const parsed = new URL(process.env.DATABASE_URL);
-    safeTargetHost = parsed.hostname || 'unknown';
-    safeTargetPort = parseInt(parsed.port, 10) || 5432;
-    safeTargetDb = parsed.pathname ? parsed.pathname.replace(/^\//, '') : 'postgres';
-    isRemoteHost = !['localhost', '127.0.0.1'].includes(safeTargetHost);
+    return fs.readFileSync(filePath, 'utf8');
   } catch {
-    isRemoteHost = !process.env.DATABASE_URL.includes('localhost') && !process.env.DATABASE_URL.includes('127.0.0.1');
+    throw new Error(`Unable to read the configured PostgreSQL ${description} file.`);
   }
-} else {
-  safeTargetHost = process.env.DB_HOST || 'localhost';
-  safeTargetPort = parseInt(process.env.DB_PORT, 10) || 5432;
-  safeTargetDb = process.env.DB_NAME || 'urbanpulse';
-  isRemoteHost = Boolean(process.env.DB_HOST && !['localhost', '127.0.0.1'].includes(process.env.DB_HOST));
 }
 
-const useSsl = !isExplicitlyDisabled && (isExplicitlyEnabled || isRemoteHost);
+function normalizePem(pem) {
+  return pem.replace(/\\n/g, '\n').trim();
+}
 
-const poolConfig = process.env.DATABASE_URL
-  ? {
-      connectionString: process.env.DATABASE_URL,
-      ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 30000,
-      max: 10,
+function buildPoolConfig(environment = process.env) {
+  const isExplicitlyDisabled = environment.DB_SSL === 'false';
+  const isExplicitlyEnabled = environment.DB_SSL === 'true';
+  const databaseUrl = environment.DATABASE_URL || '';
+  const caFromEnvironment = environment.DB_SSL_CA || '';
+  const caFileFromEnvironment = environment.DB_SSL_CA_PATH || '';
+
+  if (caFromEnvironment && caFileFromEnvironment) {
+    throw new Error('Set only one of DB_SSL_CA or DB_SSL_CA_PATH.');
+  }
+
+  let isRemoteHost = false;
+  let safeTargetHost = 'localhost';
+  let safeTargetPort = 5432;
+  let safeTargetDb = 'urbanpulse';
+  let connectionMode = 'DISCRETE_PARAMS';
+  let normalizedDatabaseUrl = '';
+  let sslModeFromUrl = '';
+  let sslFlagFromUrl = '';
+  let caFromUrl = '';
+  let clientCertificate = '';
+  let clientKey = '';
+  let clientKeyPassphrase = '';
+  let usesUrlTlsFileOptions = false;
+
+  if (databaseUrl) {
+    connectionMode = 'DATABASE_URL';
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(databaseUrl);
+    } catch {
+      throw new Error('DATABASE_URL must be a valid PostgreSQL connection URL.');
     }
-  : {
-      host: safeTargetHost,
-      port: safeTargetPort,
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || process.env.PGPASSWORD,
-      database: safeTargetDb,
-      ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 30000,
-      max: 10,
-    };
 
-// Initialize PostgreSQL Connection Pool using environment variables
+    if (!['postgres:', 'postgresql:'].includes(parsedUrl.protocol)) {
+      throw new Error('DATABASE_URL must use the postgres or postgresql protocol.');
+    }
+
+    safeTargetHost = parsedUrl.hostname || 'unknown';
+    safeTargetPort = parseInt(parsedUrl.port, 10) || 5432;
+    safeTargetDb = parsedUrl.pathname ? parsedUrl.pathname.replace(/^\//, '') : 'postgres';
+    isRemoteHost = !['localhost', '127.0.0.1', '::1'].includes(safeTargetHost);
+
+    sslModeFromUrl = (parsedUrl.searchParams.get('sslmode') || '').toLowerCase();
+    sslFlagFromUrl = (parsedUrl.searchParams.get('ssl') || '').toLowerCase();
+    const supportedSslFlags = new Set(['', 'true', '1', 'false', '0']);
+    if (!supportedSslFlags.has(sslFlagFromUrl)) {
+      throw new Error('DATABASE_URL has an unsupported ssl parameter.');
+    }
+    if (sslModeFromUrl === 'no-verify') {
+      throw new Error('DATABASE_URL sslmode=no-verify is not allowed.');
+    }
+    if (sslModeFromUrl && !['disable', ...SECURE_SSL_MODES].includes(sslModeFromUrl)) {
+      throw new Error('DATABASE_URL has an unsupported sslmode.');
+    }
+
+    const urlDisablesSsl = sslModeFromUrl === 'disable' || ['false', '0'].includes(sslFlagFromUrl);
+    const urlEnablesSsl = SECURE_SSL_MODES.has(sslModeFromUrl) || ['true', '1'].includes(sslFlagFromUrl);
+    if ((isRemoteHost && (isExplicitlyDisabled || urlDisablesSsl)) || (isExplicitlyEnabled && urlDisablesSsl) || (isExplicitlyDisabled && urlEnablesSsl)) {
+      throw new Error('PostgreSQL TLS settings conflict or disable TLS for a remote database.');
+    }
+
+    caFromUrl = parsedUrl.searchParams.get('sslrootcert') || '';
+    const clientCertificatePath = parsedUrl.searchParams.get('sslcert') || '';
+    const clientKeyPath = parsedUrl.searchParams.get('sslkey') || '';
+    clientKeyPassphrase = parsedUrl.searchParams.get('sslpassword') || '';
+    usesUrlTlsFileOptions = Boolean(caFromUrl || clientCertificatePath || clientKeyPath || clientKeyPassphrase);
+
+    if (isExplicitlyDisabled && usesUrlTlsFileOptions) {
+      throw new Error('DATABASE_URL TLS certificate options conflict with DB_SSL=false.');
+    }
+
+    if ((caFromEnvironment || caFileFromEnvironment) && usesUrlTlsFileOptions) {
+      throw new Error('Use DB_SSL_CA or DB_SSL_CA_PATH instead of TLS certificate file options in DATABASE_URL.');
+    }
+
+    if (caFromUrl) caFromUrl = readPemFile(caFromUrl, 'root CA');
+    if (clientCertificatePath) clientCertificate = readPemFile(clientCertificatePath, 'client certificate');
+    if (clientKeyPath) clientKey = readPemFile(clientKeyPath, 'client key');
+
+    // pg parses sslmode after pool options and can replace the ssl object. Remove
+    // these transport flags after validating them so only our strict TLS config
+    // controls certificate verification.
+    for (const key of ['sslmode', 'ssl', 'uselibpqcompat', 'sslrootcert', 'sslcert', 'sslkey', 'sslpassword']) {
+      parsedUrl.searchParams.delete(key);
+    }
+    normalizedDatabaseUrl = parsedUrl.toString();
+  } else {
+    safeTargetHost = environment.DB_HOST || 'localhost';
+    safeTargetPort = parseInt(environment.DB_PORT, 10) || 5432;
+    safeTargetDb = environment.DB_NAME || 'urbanpulse';
+    isRemoteHost = Boolean(environment.DB_HOST && !['localhost', '127.0.0.1', '::1'].includes(environment.DB_HOST));
+    if (isRemoteHost && isExplicitlyDisabled) {
+      throw new Error('DB_SSL=false is not allowed for a remote PostgreSQL database.');
+    }
+  }
+
+  const caFromEnv = caFromEnvironment
+    ? normalizePem(caFromEnvironment)
+    : caFileFromEnvironment
+      ? readPemFile(caFileFromEnvironment, 'CA')
+      : '';
+  const hasCustomCa = Boolean(caFromEnv || caFromUrl);
+  const useSsl = !isExplicitlyDisabled && (isExplicitlyEnabled || isRemoteHost || Boolean(sslModeFromUrl && SECURE_SSL_MODES.has(sslModeFromUrl)) || ['true', '1'].includes(sslFlagFromUrl) || hasCustomCa || usesUrlTlsFileOptions);
+
+  if ((caFromEnvironment || caFileFromEnvironment) && !useSsl) {
+    throw new Error('PostgreSQL CA configuration requires TLS; do not set DB_SSL=false.');
+  }
+
+  const ssl = useSsl
+    ? {
+        rejectUnauthorized: true,
+        ...(hasCustomCa ? { ca: [caFromEnv, caFromUrl].filter(Boolean).join('\n') } : {}),
+        ...(clientCertificate ? { cert: clientCertificate } : {}),
+        ...(clientKey ? { key: clientKey } : {}),
+        ...(clientKeyPassphrase ? { passphrase: clientKeyPassphrase } : {}),
+      }
+    : undefined;
+
+  const poolConfig = normalizedDatabaseUrl
+    ? {
+        connectionString: normalizedDatabaseUrl,
+        ...(ssl ? { ssl } : {}),
+        connectionTimeoutMillis: 10000,
+        idleTimeoutMillis: 30000,
+        max: 10,
+      }
+    : {
+        host: safeTargetHost,
+        port: safeTargetPort,
+        user: environment.DB_USER || 'postgres',
+        password: environment.DB_PASSWORD || environment.PGPASSWORD,
+        database: safeTargetDb,
+        ...(ssl ? { ssl } : {}),
+        connectionTimeoutMillis: 10000,
+        idleTimeoutMillis: 30000,
+        max: 10,
+      };
+
+  return {
+    poolConfig,
+    safeDiagnostics: {
+      connectionMode,
+      targetHost: safeTargetHost,
+      targetPort: safeTargetPort,
+      targetDatabase: safeTargetDb,
+      sslEnabled: useSsl,
+    },
+  };
+}
+
+const { poolConfig, safeDiagnostics } = buildPoolConfig();
 const pool = new Pool(poolConfig);
 
 // Safe, non-secret diagnostic metadata (no credentials or passwords)
-const safeDiagnostics = {
-  connectionMode,
-  targetHost: safeTargetHost,
-  targetPort: safeTargetPort,
-  targetDatabase: safeTargetDb,
-  sslEnabled: useSsl,
-};
+pool.safeDiagnostics = safeDiagnostics;
+pool.buildPoolConfig = buildPoolConfig;
 
 // Log any unexpected pool errors
 pool.on('error', (err) => {
@@ -75,4 +185,3 @@ pool.on('error', (err) => {
 });
 
 module.exports = pool;
-module.exports.safeDiagnostics = safeDiagnostics;

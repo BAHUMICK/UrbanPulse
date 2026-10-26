@@ -254,7 +254,7 @@ function ReportIssue({ onIssueCreated }) {
           <div className="intel-header-left">
             <span className="intel-header-badge">CIVIC INGESTION</span>
             <div>
-              <div className="intel-header-title">Report Civic Infrastructure Issue</div>
+              <div className="intel-header-title">Report a civic infrastructure issue</div>
               <div className="intel-header-sub">
                 Capture anomalies across municipal sectors with verified image/video proof
               </div>
@@ -527,7 +527,7 @@ function ReportIssue({ onIssueCreated }) {
               </button>
 
               <button type="submit" className="form-submit-btn" disabled={submitting}>
-                {submitting ? 'Ingesting into UrbanPulse...' : 'Submit Incident Report →'}
+                {submitting ? 'Submitting report...' : 'Submit report →'}
               </button>
             </div>
           </form>

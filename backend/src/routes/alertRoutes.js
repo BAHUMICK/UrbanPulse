@@ -12,12 +12,12 @@ const { authenticate, requireRole } = require('../middleware/auth');
 /**
  * GET /api/alerts
  */
-router.get('/', getAllAlerts);
+router.get('/', authenticate, requireRole('admin'), getAllAlerts);
 
 /**
  * GET /api/alerts/active
  */
-router.get('/active', getActiveAlerts);
+router.get('/active', authenticate, requireRole('admin'), getActiveAlerts);
 
 /**
  * PUT /api/alerts/:id/status

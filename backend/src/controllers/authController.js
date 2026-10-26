@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { promisify } = require('util');
 const pool = require('../config/db');
-const { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, cookieOptions, hashToken, readCookie, createCsrfToken } = require('../middleware/auth');
+const { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, authDatabaseErrorMessage, cookieOptions, hashToken, readCookie, createCsrfToken } = require('../middleware/auth');
 
 const scrypt = promisify(crypto.scrypt);
 const attempts = new Map();
@@ -63,7 +63,7 @@ async function createSession(userId, executor = pool) {
 
 function csrf(req, res) {
   try { return res.json({ success: true, token: createCsrfToken() }); }
-  catch { return res.status(503).json({ success: false, message: 'Authentication is not configured on this server.' }); }
+  catch { return res.status(503).json({ success: false, message: 'Authentication is not configured on this server. Set AUTH_SECRET to a random value of at least 32 bytes.' }); }
 }
 
 async function register(req, res) {
@@ -95,13 +95,13 @@ async function register(req, res) {
     }
     if (error.code === '23505') return res.status(409).json({ success: false, message: 'An account with this email already exists.' });
     console.error('Registration failed:', error.code || error.name);
-    return res.status(503).json({ success: false, message: 'Could not create account. Check server authentication setup.' });
+    return res.status(503).json({ success: false, message: authDatabaseErrorMessage(error, 'Could not create account. Check server authentication setup.') });
   } finally {
     client?.release(discardClient || undefined);
   }
 }
 
-async function login(req, res) {
+async function signIn(req, res, requiredRole = null) {
   const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   const password = typeof req.body.password === 'string' ? req.body.password : '';
   if (!email || email.length > 254 || !password || Buffer.byteLength(password) > PASSWORD_BYTES_MAX) return res.status(400).json({ success: false, message: 'Enter your email and password.' });
@@ -111,26 +111,37 @@ async function login(req, res) {
     const candidateHash = user ? user.password_hash : await dummyPasswordHash;
     const passwordMatches = await verifyPassword(password, candidateHash);
     if (!user || !passwordMatches) return res.status(401).json({ success: false, message: 'Email or password is incorrect.' });
+    if (requiredRole && user.role !== requiredRole) {
+      return res.status(403).json({ success: false, message: 'This account is not authorized for administrator access.' });
+    }
     await pool.query('DELETE FROM auth_sessions WHERE user_id = $1 AND expires_at <= NOW()', [user.id]);
     const token = await createSession(user.id);
     setSessionCookie(res, token);
     return res.json({ success: true, data: { id: user.id, email: user.email, role: user.role } });
   } catch (error) {
     console.error('Login failed:', error.code || error.name);
-    return res.status(503).json({ success: false, message: 'Could not sign in. Check server authentication setup.' });
+    return res.status(503).json({ success: false, message: authDatabaseErrorMessage(error, 'Could not sign in. Check server authentication setup.') });
   }
 }
+
+function login(req, res) { return signIn(req, res); }
+function adminLogin(req, res) { return signIn(req, res, 'admin'); }
 
 async function me(req, res) { return res.json({ success: true, data: req.user }); }
 
 async function logout(req, res) {
   const token = readCookie(req, SESSION_COOKIE);
   if (token) {
-    try { await pool.query('DELETE FROM auth_sessions WHERE token_hash = $1', [hashToken(token)]); }
-    catch (error) { console.error('Session revocation failed:', error.code || error.name); }
+    try {
+      await pool.query('DELETE FROM auth_sessions WHERE token_hash = $1', [hashToken(token)]);
+    } catch (error) {
+      console.error('Session revocation failed:', error.code || error.name);
+      clearSessionCookie(res);
+      return res.status(503).json({ success: false, message: 'Could not finish signing out. Please try again.' });
+    }
   }
   clearSessionCookie(res);
   return res.json({ success: true });
 }
 
-module.exports = { authRateLimit, createAuthRateLimiter, hashPassword, verifyPassword, csrf, register, login, me, logout };
+module.exports = { authRateLimit, createAuthRateLimiter, hashPassword, verifyPassword, csrf, register, login, adminLogin, me, logout };

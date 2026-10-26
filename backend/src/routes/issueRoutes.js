@@ -65,11 +65,11 @@ const handleEvidenceUpload = (req, res, next) => {
   });
 };
 
-// GET /api/issues
-router.get('/issues', getAllIssues);
+// Issue reads require a session. Citizens receive only their owned reports;
+// administrators receive the city-wide incident set.
+router.get('/issues', authenticate, requireRole('citizen', 'admin'), getAllIssues);
 
-// GET /api/issues/:id
-router.get('/issues/:id', getIssueById);
+router.get('/issues/:id', authenticate, requireRole('citizen', 'admin'), getIssueById);
 
 // POST /api/issues (accepts JSON or multipart/form-data with optional evidence files)
 router.post('/issues', authenticate, requireRole('citizen', 'admin'), handleEvidenceUpload, createIssue);

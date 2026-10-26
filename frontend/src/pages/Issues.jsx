@@ -68,9 +68,9 @@ function Issues({ onNavigate, isAdmin = false }) {
       setLoading(true);
       setError('');
       const [issuesData, priorityData, impactData] = await Promise.all([
-        getIssues().catch(() => []),
-        getPriorityIssues().catch(() => []),
-        getImpactIssues().catch(() => []),
+        getIssues(),
+        isAdmin ? getPriorityIssues() : Promise.resolve([]),
+        isAdmin ? getImpactIssues() : Promise.resolve([]),
       ]);
 
       setIssues(issuesData);
@@ -86,7 +86,7 @@ function Issues({ onNavigate, isAdmin = false }) {
 
   useEffect(() => {
     loadAllData();
-  }, []);
+  }, [isAdmin]);
 
   // Update status handler
   async function handleStatusChange(issueId, newStatus) {
@@ -334,7 +334,7 @@ function Issues({ onNavigate, isAdmin = false }) {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-            Showing <strong>{filteredIssues.length}</strong> of {issues.length} Records
+            Showing <strong>{filteredIssues.length}</strong> of {issues.length} {isAdmin ? 'records' : 'reports'}
           </span>
           <button
             type="button"
@@ -342,7 +342,7 @@ function Issues({ onNavigate, isAdmin = false }) {
             style={{ color: '#38bdf8' }}
             onClick={() => onNavigate && onNavigate('report')}
           >
-            + Ingest Issue
+            {isAdmin ? '+ Ingest Issue' : '+ Report issue'}
           </button>
         </div>
       </div>
@@ -350,7 +350,7 @@ function Issues({ onNavigate, isAdmin = false }) {
       {/* INCIDENT DATA TABLE */}
       <div className="table-panel">
         <div className="table-responsive">
-          <table className="incident-table">
+          <table className={`incident-table ${isAdmin ? 'admin-view' : 'citizen-view'}`}>
             <thead>
               <tr>
                 <th style={{ width: '45px' }}>ID</th>
@@ -358,7 +358,7 @@ function Issues({ onNavigate, isAdmin = false }) {
                 <th>Civic Sector</th>
                 <th>Category</th>
                 <th>Severity</th>
-                <th>Priority</th>
+                {isAdmin && <th>Priority</th>}
                 <th>Evidence / Proof</th>
                 <th>Status</th>
                 <th style={{ textAlign: 'center', width: '80px' }}>Action</th>
@@ -367,14 +367,14 @@ function Issues({ onNavigate, isAdmin = false }) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                  <td colSpan={isAdmin ? 9 : 8} role="status" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
                     Loading incident repository...
                   </td>
                 </tr>
               ) : paginatedIssues.length === 0 ? (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                    No infrastructure incidents matched your active filters.
+                  <td colSpan={isAdmin ? 9 : 8} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                    {issues.length === 0 ? 'You have not submitted any reports yet.' : 'No reports matched your active filters.'}
                   </td>
                 </tr>
               ) : (
@@ -414,7 +414,7 @@ function Issues({ onNavigate, isAdmin = false }) {
                         <SeverityBadge severity={issue.severity} size="small" />
                       </td>
 
-                      <td>
+                      {isAdmin && <td>
                         {intel.priorityScore !== undefined ? (
                           <span style={{ fontWeight: 800, color: '#f1f5f9', fontSize: 13 }}>
                             {intel.priorityScore}
@@ -422,7 +422,7 @@ function Issues({ onNavigate, isAdmin = false }) {
                         ) : (
                           <span style={{ color: 'var(--text-muted)' }}>—</span>
                         )}
-                      </td>
+                      </td>}
 
                       <td>
                         <EvidenceBadge

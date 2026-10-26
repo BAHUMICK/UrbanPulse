@@ -10,9 +10,11 @@ import Issues from './pages/Issues';
 import Analytics from './pages/Analytics';
 import Alerts from './pages/Alerts';
 import MapView from './components/MapView';
+import CitizenDashboard from './pages/CitizenDashboard';
 
 import { getIssues, getActiveAlerts, checkBackendHealth, getCurrentUser, logoutAccount } from './services/api';
 import AuthPage from './pages/AuthPage';
+import { pageForRole } from './routeAccess';
 import './App.css';
 
 function App() {
@@ -21,9 +23,7 @@ function App() {
 
   // Determine current page from URL path
   const path = location.pathname.replace(/^\//, '').split('?')[0];
-  const currentPage = ['dashboard', 'map', 'issues', 'report', 'alerts', 'analytics'].includes(path)
-    ? path
-    : 'dashboard';
+  const requestedPage = ['dashboard', 'map', 'issues', 'report', 'alerts', 'analytics'].includes(path) ? path : 'dashboard';
 
   const [totalIssuesCount, setTotalIssuesCount] = useState(0);
   const [activeAlertCount, setActiveAlertCount] = useState(0);
@@ -32,18 +32,24 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const authPage = path === 'login' || path === 'register';
+  const [authError, setAuthError] = useState('');
+  const currentPage = user ? pageForRole(requestedPage, user.role) : requestedPage;
+  const authPage = path === 'login' || path === 'register' || path === 'admin/login';
 
   useEffect(() => {
     let mounted = true;
     getCurrentUser().then((current) => { if (mounted) setUser(current); })
-      .catch(() => { if (mounted) setUser(null); })
+      .catch((error) => { if (mounted) { setUser(null); setAuthError(error.message); } })
       .finally(() => { if (mounted) setAuthLoading(false); });
     return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
-    const expireSession = () => { setUser(null); navigate('/login', { replace: true }); };
+    const expireSession = () => {
+      setUser(null);
+      setAuthError('Your session expired. Sign in again to continue.');
+      navigate('/login', { replace: true });
+    };
     window.addEventListener('urbanpulse:session-expired', expireSession);
     return () => window.removeEventListener('urbanpulse:session-expired', expireSession);
   }, [navigate]);
@@ -52,16 +58,18 @@ function App() {
     if (authLoading) return;
     if (!user && !authPage) navigate('/login', { replace: true });
     else if (user && authPage) navigate('/dashboard', { replace: true });
-  }, [authLoading, user, authPage, navigate]);
+    else if (user && requestedPage !== currentPage) navigate('/dashboard', { replace: true });
+  }, [authLoading, user, authPage, requestedPage, currentPage, navigate]);
 
   // Load telemetry stats for sidebar and header counters
   const fetchTelemetry = useCallback(async () => {
+    if (authLoading || !user) return;
     try {
       setRefreshing(true);
       const [healthData, issuesData, alertsData] = await Promise.all([
         checkBackendHealth().catch(() => ({ status: 'DOWN' })),
         getIssues().catch(() => []),
-        getActiveAlerts().catch(() => []),
+        user.role === 'admin' ? getActiveAlerts().catch(() => []) : Promise.resolve([]),
       ]);
 
       setSystemOnline(healthData?.status === 'UP');
@@ -73,14 +81,15 @@ function App() {
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [authLoading, user]);
 
   useEffect(() => {
+    if (authLoading || !user) return undefined;
     fetchTelemetry();
     // Poll telemetry every 30 seconds
     const interval = setInterval(fetchTelemetry, 30000);
     return () => clearInterval(interval);
-  }, [fetchTelemetry]);
+  }, [fetchTelemetry, authLoading, user]);
 
   function handleNavigate(pageId) {
     if (pageId === 'dashboard') {
@@ -96,17 +105,19 @@ function App() {
   }
 
   async function handleLogout() {
-    try { await logoutAccount(); } catch (error) { console.error('Sign-out request failed:', error.message); }
+    try { await logoutAccount(); }
+    catch (error) { console.error('Sign-out request failed:', error.message); setAuthError(error.message); }
     setUser(null);
     navigate('/login', { replace: true });
   }
 
   if (authLoading) return <main className="auth-loading" role="status">Loading UrbanPulse…</main>;
-  if (!user) return <AuthPage onAuthenticated={(nextUser) => { setUser(nextUser); navigate('/dashboard', { replace: true }); }} />;
+  if (!user) return <AuthPage initialError={authError} onAuthenticated={(nextUser) => { setAuthError(''); setUser(nextUser); navigate('/dashboard', { replace: true }); }} />;
 
   function renderPage() {
     switch (currentPage) {
       case 'dashboard':
+        if (user.role === 'citizen') return <CitizenDashboard user={user} onNavigate={handleNavigate} />;
         return (
           <Dashboard
             key={refreshKey}

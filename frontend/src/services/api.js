@@ -1,15 +1,48 @@
-const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
-export const API_ORIGIN = API_URL.replace(/\/api$/, '');
-export const getMediaUrl = (filePath) => filePath?.startsWith('http') ? filePath : `${API_ORIGIN}${filePath || ''}`;
+import { resolveApiUrl, resolveApiOrigin, resolveEvidenceUrl } from './apiUrl';
+import { apiErrorMessage } from './apiErrors';
+
+export const API_URL = resolveApiUrl(import.meta.env.VITE_API_URL);
+export const API_ORIGIN = resolveApiOrigin(API_URL);
+export const getMediaUrl = (filePath) => resolveEvidenceUrl(filePath, API_URL);
 let csrfToken = '';
+
+async function fetchWithTimeout(url, options) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  try {
+    return await fetch(url, { ...options, signal: options.signal || controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function readJsonResponse(response, endpoint) {
+  let result;
+  try { result = await response.json(); }
+  catch {
+    if (!response.ok) throw Object.assign(new Error(apiErrorMessage({ status: response.status, endpoint })), { status: response.status });
+    throw new Error(apiErrorMessage({ status: 503, endpoint }));
+  }
+  if (!response.ok) {
+    const error = new Error(apiErrorMessage({ status: response.status, endpoint, error: result }));
+    error.status = response.status;
+    throw error;
+  }
+  return result;
+}
 
 async function ensureCsrfToken() {
   if (csrfToken) return csrfToken;
-  const response = await fetch(`${API_URL}/auth/csrf`, { credentials: 'include' });
-  const result = await response.json();
-  if (!response.ok || !result?.token) throw new Error(result?.message || 'Unable to verify request.');
-  csrfToken = result.token;
-  return csrfToken;
+  try {
+    const response = await fetchWithTimeout(`${API_URL}/auth/csrf`, { credentials: 'include' });
+    const result = await readJsonResponse(response, '/auth/csrf');
+    if (!result?.token) throw new Error('Unable to verify this request. Please try again.');
+    csrfToken = result.token;
+    return csrfToken;
+  } catch (error) {
+    if (error.status) throw error;
+    throw new Error(apiErrorMessage({ error }));
+  }
 }
 
 // =====================================================
@@ -78,46 +111,33 @@ async function request(endpoint, options = {}) {
     };
     if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) headers['X-CSRF-Token'] = await ensureCsrfToken();
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const response = await fetchWithTimeout(`${API_URL}${endpoint}`, {
       ...fetchOptions,
       headers,
       credentials: 'include',
     });
-
-    let result;
-
-    try {
-      result = await response.json();
-    } catch {
-      throw new Error(
-        `Server returned an invalid response (${response.status})`
-      );
-    }
-
-    if (!response.ok) {
-      const error = new Error(
-        result?.message ||
-          result?.error ||
-          `API request failed with status ${response.status}`
-      );
-      error.status = response.status;
-      if (response.status === 401 && !['/auth/me', '/auth/login', '/auth/register'].includes(endpoint)) {
+    return await readJsonResponse(response, endpoint);
+  } catch (error) {
+    if (!quiet) console.error(`UrbanPulse API error [${endpoint}]:`, error.message);
+    if (error.status) {
+      if (error.status === 401 && !['/auth/me', '/auth/login', '/auth/admin/login', '/auth/register'].includes(endpoint)) {
         window.dispatchEvent(new Event('urbanpulse:session-expired'));
       }
       throw error;
     }
-
-    return result;
-  } catch (error) {
-    if (!quiet) console.error(`UrbanPulse API error [${endpoint}]:`, error);
-
-    throw error;
+    if (error.message?.startsWith('Unable to connect') || error.message?.startsWith('The service is taking')) throw error;
+    throw new Error(apiErrorMessage({ error }));
   }
 }
 
 export async function getCurrentUser() {
-  const result = await request('/auth/me', { quiet: true });
-  return result?.data || null;
+  try {
+    const result = await request('/auth/me', { quiet: true });
+    return result?.data || null;
+  } catch (error) {
+    if (error.status === 401) return null;
+    throw error;
+  }
 }
 
 export async function registerAccount(email, password) {
@@ -125,8 +145,9 @@ export async function registerAccount(email, password) {
   return result.data;
 }
 
-export async function loginAccount(email, password) {
-  const result = await request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+export async function loginAccount(email, password, { admin = false } = {}) {
+  const endpoint = admin ? '/auth/admin/login' : '/auth/login';
+  const result = await request(endpoint, { method: 'POST', body: JSON.stringify({ email, password }) });
   return result.data;
 }
 

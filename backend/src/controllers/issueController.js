@@ -73,6 +73,11 @@ const getAllIssues = async (req, res) => {
     const whereClauses = [];
     const values = [];
 
+    if (req.user.role !== 'admin') {
+      values.push(req.user.id);
+      whereClauses.push(`i.reporter_user_id = $${values.length}`);
+    }
+
     if (sector && sector !== 'All') {
       values.push(sector);
       whereClauses.push(`i.sector = $${values.length}`);
@@ -159,6 +164,7 @@ const getIssueById = async (req, res) => {
       });
     }
 
+    const accessClause = req.user.role === 'admin' ? '' : 'AND i.reporter_user_id = $2';
     const query = `
       SELECT
         i.id,
@@ -186,11 +192,12 @@ const getIssueById = async (req, res) => {
         ) AS evidence
       FROM issues i
       LEFT JOIN issue_evidence e ON i.id = e.issue_id
-      WHERE i.id = $1
+      WHERE i.id = $1 ${accessClause}
       GROUP BY i.id;
     `;
 
-    const result = await pool.query(query, [issueId]);
+    const values = req.user.role === 'admin' ? [issueId] : [issueId, req.user.id];
+    const result = await pool.query(query, values);
 
     if (result.rows.length === 0) {
       return res.status(404).json({
@@ -352,7 +359,8 @@ const createIssue = async (req, res) => {
         latitude,
         longitude,
         severity,
-        status
+        status,
+        reporter_user_id
       )
       VALUES (
         $1,
@@ -362,7 +370,8 @@ const createIssue = async (req, res) => {
         $5,
         $6,
         $7,
-        'Reported'
+        'Reported',
+        $8
       )
       RETURNING
         id,
@@ -384,7 +393,8 @@ const createIssue = async (req, res) => {
       cleanDescription,
       numericLatitude,
       numericLongitude,
-      severity
+      severity,
+      req.user.id
     ];
 
     const result = await pool.query(query, values);

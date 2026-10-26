@@ -11,8 +11,7 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       open: false,
       proxy: {
-        '/api': { target: apiOrigin, changeOrigin: true },
-        '/uploads': { target: apiOrigin, changeOrigin: true }
+        '/api': { target: apiOrigin, changeOrigin: true }
       }
     }
   };

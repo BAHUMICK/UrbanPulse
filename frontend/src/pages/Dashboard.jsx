@@ -35,10 +35,10 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
       setLoading(true);
       setError('');
       const [issuesData, priorityData, impactData, alertsData] = await Promise.all([
-        getIssues().catch(() => []),
-        getPriorityIssues().catch(() => []),
-        getImpactIssues().catch(() => []),
-        getActiveAlerts().catch(() => []),
+        getIssues(),
+        getPriorityIssues(),
+        getImpactIssues(),
+        getActiveAlerts(),
       ]);
 
       setIssues(issuesData);

@@ -5,10 +5,6 @@
       "destination": "https://urbanpulse-api-okyo.onrender.com/api/:path*"
     },
     {
-      "source": "/uploads/:path*",
-      "destination": "https://urbanpulse-api-okyo.onrender.com/uploads/:path*"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

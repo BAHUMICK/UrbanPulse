@@ -128,7 +128,7 @@ UrbanPulse follows a clean **3-Tier Client–Server–Database Architecture** wi
 +-------------------------------------------------------------------------+
 |                      BACKEND REST API (Port 5000)                       |
 |  Express.js Entry: backend/src/index.js                                 |
-|  Static Media Server: /uploads/* -> configured UPLOAD_DIR               |
+|  Authenticated Evidence: /api/uploads/:fileName -> configured UPLOAD_DIR |
 |                                                                         |
 |  +---------------------------+    +----------------------------------+  |
 |  | Controllers               |    | Rule-Based Intelligence Services |  |
@@ -180,7 +180,7 @@ Located in `D:\UrbanPulse\frontend\src`:
 
 Located in `D:\UrbanPulse\backend\src`:
 
-- **`index.js`**: Express application entry point. Configures CORS, JSON/URL-encoded body parsers, static serving of `/uploads` from the configured `UPLOAD_DIR` (defaulting to `backend/uploads`), API routes, 404 fallback, and generic error handling.
+- **`index.js`**: Express application entry point. Configures exact-origin CORS, JSON/URL-encoded body parsers, authenticated evidence routes, API routes, 404 fallback, and generic error handling.
 - **`config/db.js`**: Initializes and exports the `pg.Pool` instance using environment variables from `backend/.env` without hardcoding any credentials.
 - **`config/upload.js`**: Configures `multer.diskStorage` to store evidence in `UPLOAD_DIR` or the default `backend/uploads` directory, with collision-resistant generated filenames, MIME/extension checks, and a `50 MB` per-file size limit. `routes/issueRoutes.js` adds file-signature checks and owns the upload wrapper.
 - **`controllers/issueController.js`**: Handles `getAllIssues` (with optional `sector`, `category`, `severity`, `status` query filters and `LEFT JOIN issue_evidence` aggregated via `json_agg`), `getIssueById`, `createIssue` (validates fields, cleans up orphan files on validation errors, inserts issue + evidence records, and triggers alert evaluation), and `updateIssueStatus` (updates issue status and synchronizes linked alerts).
@@ -327,7 +327,7 @@ Citizens and field inspectors can attach visual proof when submitting an issue:
 - **Supported Image Formats:** `.jpg`, `.jpeg`, `.png`, `.webp` (`image/jpeg`, `image/png`, `image/webp`)
 - **Supported Video Formats:** `.mp4`, `.webm`, `.mov` (`video/mp4`, `video/webm`, `video/quicktime`)
 - **Maximum File Size:** `50 MB` per file (enforced on both frontend and backend Multer middleware)
-- **Storage Mechanism:** Files are stored in `backend/uploads/` by default or in the absolute directory configured by backend `UPLOAD_DIR`. The API validates extension, declared MIME type, and file signature before accepting media. Files are served statically under `/uploads/`.
+- **Storage Mechanism:** Files are stored in `backend/uploads/` by default or in the absolute directory configured by backend `UPLOAD_DIR`. The API validates extension, declared MIME type, and file signature before accepting media. Evidence is served through `/api/uploads/:fileName` after ownership or administrator authorization.
 - **Persistent hosting:** Configure `UPLOAD_DIR` as a mounted persistent volume shared with the backend instance serving media, and back up that volume alongside the database. Ephemeral container disks lose uploads on restart; when using multiple instances, use shared storage or route media requests to the instance that owns the files. This project does not provision hosted storage.
 - **Database Linking:** File metadata (`file_name`, `file_path`, `file_type`, `file_size`) is stored in `issue_evidence` with `ON DELETE CASCADE` to `issues(id)`.
 - **Orphan File Protection:** If an issue submission fails backend field validation (`HTTP 400`), `issueController.js` automatically cleans up the temporary uploaded file from disk.
@@ -459,7 +459,9 @@ Ensure the following software is installed on your machine before running UrbanP
 
 ## 22. Environment Variable Configuration
 
-The frontend uses `VITE_API_URL` as its API prefix and defaults to `/api`. Leave it empty both locally and in Vercel when using the existing routing: Vite proxies `/api` and `/uploads` to `http://localhost:5000` (or `VITE_DEV_API_ORIGIN`) locally, and `frontend/vercel.json` rewrites those paths to the Render backend in production. This keeps browser requests on the frontend origin, so the session cookie is first-party and `SameSite=Lax` works for credentialed `fetch` requests. Set backend `CORS_ORIGINS` to the exact allowed frontend origins; the Vercel rewrite preserves the browser-facing origin. Set backend `UPLOAD_DIR` to a mounted persistent directory on the host. Set `VITE_API_URL` only if intentionally bypassing the rewrite with a direct cross-origin API URL; then configure credentialed CORS and test browser cookie behavior explicitly.
+PostgreSQL connections to non-loopback hosts always use TLS with certificate and hostname verification enabled. The system trust store is used by default. If the database provider uses a private CA, configure exactly one backend setting: `DB_SSL_CA` with the PEM certificate (literal `\\n` line breaks are accepted), or `DB_SSL_CA_PATH` with the path to a readable PEM file mounted for the backend. `DB_SSL=false` is for local loopback development only; remote connections with TLS disabled and `DATABASE_URL` values that request `sslmode=no-verify` are rejected. Secure `sslmode` URL parameters are normalized to strict verification. Do not put credentials in URLs or logs.
+
+The frontend uses `VITE_API_URL` as its API prefix and defaults to `/api`. Leave it empty both locally and in Vercel when using the existing routing: Vite proxies `/api` to `http://localhost:5000` (or `VITE_DEV_API_ORIGIN`), and `frontend/vercel.json` rewrites `/api/*` to the Render backend. Evidence URLs are converted to the authenticated `/api/uploads/*` route. This keeps browser requests on the frontend origin, so the session cookie is first-party and `SameSite=Lax` works for credentialed `fetch` requests. Set backend `CORS_ORIGINS` to exact allowed frontend origins, including any preview origin that is forwarded to Render; do not use a wildcard. Set backend `UPLOAD_DIR` to a mounted persistent directory on the host. Set `VITE_API_URL` only if intentionally bypassing the rewrite with a direct cross-origin API URL; then configure credentialed CORS and test browser cookie behavior explicitly.
 
 1. Inside `D:\UrbanPulse\backend`, copy `.env.example` to `.env`:
    ```powershell
@@ -580,10 +582,18 @@ rewrite keeps browser API calls same-origin, where Lax cookies are sent with
 credentialed fetch requests. Unsafe API requests also require a signed CSRF
 header. Public registration always creates the `citizen` role. Issue status
 and alert status changes require an administrator on the server.
+The administrator sign-in page at `/admin/login` calls the dedicated
+`POST /api/auth/admin/login` route, which accepts only accounts already assigned
+the `admin` role. Both login routes derive the role from the database session;
+no role is accepted from the browser.
 
 Before enabling authentication, take a normal database backup and apply
-`database/migrations/001_authentication.sql` to the UrbanPulse database. This is
-additive and does not modify the existing issues, alerts, or evidence tables.
+`database/migrations/001_authentication.sql` to the intended UrbanPulse database,
+then review and apply `database/migrations/002_issue_report_ownership.sql`.
+Migration 002 adds a nullable reporter foreign key and index. Existing reports
+remain intact and unowned; only administrators can see those legacy reports.
+New citizen reports are associated with the authenticated account. Neither
+migration is run automatically by the application.
 Do not run the sample-data section of `database/schema.sql` as a production
 migration.
 
@@ -591,7 +601,12 @@ Set `AUTH_SECRET` in the backend environment to a newly generated random value
 of at least 32 bytes. For example, locally run
 `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
 and copy the result into the private environment configuration; never commit it.
-Set `CORS_ORIGINS` to the exact frontend origin(s). In production, HTTPS is
+Set `CORS_ORIGINS` to a comma-separated list of exact frontend origins. Include
+the production Vercel origin and any specific preview origin that the Render
+service must accept; wildcard preview origins are not accepted. Vercel rewrites
+keep the browser URL same-origin, but verify whether the proxy forwards the
+browser `Origin` header and allow the exact preview origin if it does. In
+production, HTTPS is
 required for the secure session cookie. The existing Vercel `/api` rewrite
 keeps browser requests on the frontend origin; leave `VITE_API_URL` empty in
 Vercel so session cookies remain first-party. Keep the rewrite target aligned
@@ -607,7 +622,7 @@ UPDATE app_users SET role = 'admin' WHERE LOWER(email) = LOWER('admin@example.co
 No administrator password or account is seeded by the application. A role
 submitted by a browser is ignored.
 
-For local development, apply the migration to the local development database,
+For local development, apply migrations 001 and 002 to the local development database,
 set `AUTH_SECRET` in `backend/.env`, run the backend and frontend, then register
 at `/register`. For deployment, apply the migration first, configure
 `AUTH_SECRET` and `CORS_ORIGINS` on Render, leave `VITE_API_URL` unset on Vercel
@@ -633,6 +648,9 @@ Evidence files are stored on disk. Configure `UPLOAD_DIR` to persistent storage
 for deployments, back it up with the database, and use shared storage or
 instance-aware routing when running multiple backend instances. Otherwise
 evidence may disappear after restarts or be unavailable on another instance.
+Evidence is served through the authenticated `/api/uploads/:fileName` route:
+citizens can view only evidence for their own reports, while administrators
+can review all evidence. The old public `/uploads/*` access path is disabled.
 
 Duplicate registration currently returns HTTP 409 with an account-exists
 message to preserve a clear signup experience. This reveals whether an email

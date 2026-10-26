@@ -3,6 +3,17 @@ const pool = require('../config/db');
 
 const SESSION_COOKIE = 'urbanpulse_session';
 const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+const AUTH_SCHEMA_MISSING = 'Authentication database tables are missing. Verify the intended database and apply database/migrations/001_authentication.sql.';
+
+function authDatabaseErrorMessage(error, fallback) {
+  if (error?.code === '42P01') return AUTH_SCHEMA_MISSING;
+  if (error?.code === '42501') return 'The database role cannot access authentication tables. Check its database permissions.';
+  if (error?.code === '28P01') return 'Database authentication failed. Check the backend database credentials.';
+  if (['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNRESET', '57P03'].includes(error?.code)) {
+    return 'The authentication database is unavailable. Check the backend database connection settings and service health.';
+  }
+  return fallback;
+}
 
 function authSecret() {
   const secret = process.env.AUTH_SECRET;
@@ -49,7 +60,7 @@ function csrfProtection(req, res, next) {
     }
     return next();
   } catch {
-    return res.status(503).json({ success: false, message: 'Authentication is not configured on this server.' });
+    return res.status(503).json({ success: false, message: 'Authentication is not configured on this server. Set AUTH_SECRET to a random value of at least 32 bytes.' });
   }
 }
 
@@ -66,7 +77,7 @@ async function authenticate(req, res, next) {
     return next();
   } catch (error) {
     console.error('Authentication lookup failed:', error.code || error.name);
-    return res.status(503).json({ success: false, message: 'Authentication is temporarily unavailable.' });
+    return res.status(503).json({ success: false, message: authDatabaseErrorMessage(error, 'Authentication is temporarily unavailable.') });
   }
 }
 
@@ -78,4 +89,4 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, authSecret, cookieOptions, readCookie, hashToken, createCsrfToken, validCsrfToken, csrfProtection, authenticate, requireRole };
+module.exports = { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, authSecret, authDatabaseErrorMessage, cookieOptions, readCookie, hashToken, createCsrfToken, validCsrfToken, csrfProtection, authenticate, requireRole };

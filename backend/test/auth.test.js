@@ -2,8 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 process.env.AUTH_SECRET = 'test-only-random-secret-with-at-least-32-bytes';
 
-const { hashPassword, verifyPassword, createAuthRateLimiter } = require('../src/controllers/authController');
-const { createCsrfToken, validCsrfToken, requireRole, cookieOptions } = require('../src/middleware/auth');
+const { hashPassword, verifyPassword, createAuthRateLimiter, csrf } = require('../src/controllers/authController');
+const { createCsrfToken, validCsrfToken, authDatabaseErrorMessage, requireRole, cookieOptions } = require('../src/middleware/auth');
 const { isAlertEligible } = require('../src/services/alertService');
 
 test('scrypt password hashes verify the password but never equal it', async () => {
@@ -19,6 +19,32 @@ test('CSRF tokens validate and reject tampering', () => {
   assert.equal(validCsrfToken(token), true);
   assert.equal(validCsrfToken(`${token.slice(0, -1)}0`), false);
   assert.equal(validCsrfToken(''), false);
+});
+
+test('CSRF setup reports the AUTH_SECRET requirement without exposing its value', () => {
+  const original = process.env.AUTH_SECRET;
+  process.env.AUTH_SECRET = 'too-short';
+  let status;
+  let body;
+  const res = {
+    status(value) { status = value; return this; },
+    json(value) { body = value; return this; },
+  };
+  try {
+    csrf({}, res);
+    assert.equal(status, 503);
+    assert.equal(body.message, 'Authentication is not configured on this server. Set AUTH_SECRET to a random value of at least 32 bytes.');
+    assert.equal(body.message.includes(process.env.AUTH_SECRET), false);
+  } finally {
+    process.env.AUTH_SECRET = original;
+  }
+});
+
+test('authentication database failures return safe and distinct setup guidance', () => {
+  assert.match(authDatabaseErrorMessage({ code: '42P01' }, 'fallback'), /Verify the intended database and apply database\/migrations\/001_authentication\.sql/);
+  assert.match(authDatabaseErrorMessage({ code: '28P01' }, 'fallback'), /database credentials/);
+  assert.equal(authDatabaseErrorMessage({ code: 'ECONNREFUSED' }, 'fallback').includes('connection settings'), true);
+  assert.equal(authDatabaseErrorMessage({ code: 'XX000', detail: 'sensitive internal detail' }, 'fallback'), 'fallback');
 });
 
 test('production session cookies use HTTPS-only and same-origin-safe flags', () => {
