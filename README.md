@@ -461,7 +461,7 @@ Ensure the following software is installed on your machine before running UrbanP
 
 PostgreSQL connections to non-loopback hosts always use TLS with certificate and hostname verification enabled. The system trust store is used by default. If the database provider uses a private CA, configure exactly one backend setting: `DB_SSL_CA` with the PEM certificate (literal `\\n` line breaks are accepted), or `DB_SSL_CA_PATH` with the path to a readable PEM file mounted for the backend. `DB_SSL=false` is for local loopback development only; remote connections with TLS disabled and `DATABASE_URL` values that request `sslmode=no-verify` are rejected. Secure `sslmode` URL parameters are normalized to strict verification. Do not put credentials in URLs or logs.
 
-The frontend uses `VITE_API_URL` as its API prefix and defaults to `/api`. Leave it empty both locally and in Vercel when using the existing routing: Vite proxies `/api` to `http://localhost:5000` (or `VITE_DEV_API_ORIGIN`), and `frontend/vercel.json` rewrites `/api/*` to the Render backend. Evidence URLs are converted to the authenticated `/api/uploads/*` route. This keeps browser requests on the frontend origin, so the session cookie is first-party and `SameSite=Lax` works for credentialed `fetch` requests. Set backend `CORS_ORIGINS` to exact allowed frontend origins, including any preview origin that is forwarded to Render; do not use a wildcard. Set backend `UPLOAD_DIR` to a mounted persistent directory on the host. Set `VITE_API_URL` only if intentionally bypassing the rewrite with a direct cross-origin API URL; then configure credentialed CORS and test browser cookie behavior explicitly.
+The frontend uses `VITE_API_URL` as its API prefix and defaults to `/api`. Leave it empty both locally and in Vercel when using the existing routing: Vite proxies `/api` to `http://localhost:5000` (or `VITE_DEV_API_ORIGIN`), and `frontend/vercel.json` rewrites `/api/*` to the Render backend. Evidence URLs are converted to the authenticated `/api/uploads/*` route. The rewrite keeps browser requests on the frontend origin. If Vercel is configured to call Render directly instead, set backend `CORS_ORIGINS` to exact allowed frontend origins, including any required preview origin, and retain credentialed CORS; do not use a wildcard. Production session cookies use `SameSite=None; Secure` for cross-site credentialed requests. Some browsers or privacy settings may block third-party cookies, so the same-origin rewrite is preferred. Set backend `UPLOAD_DIR` to a mounted persistent directory on the host.
 
 1. Inside `D:\UrbanPulse\backend`, copy `.env.example` to `.env`:
    ```powershell
@@ -577,9 +577,9 @@ To maintain transparency and academic rigor, the following scope boundaries appl
 The API stores citizen accounts in `app_users` and opaque session-token hashes in
 `auth_sessions`. Passwords are hashed with Node.js scrypt. Session cookies are
 HttpOnly and expire after seven days; production cookies use `Secure` and
-`SameSite=Lax`, while local HTTP development omits `Secure`. The current Vercel
-rewrite keeps browser API calls same-origin, where Lax cookies are sent with
-credentialed fetch requests. Unsafe API requests also require a signed CSRF
+`SameSite=None` to support direct cross-site credentialed fetches, while local
+HTTP development retains `SameSite=Lax` and omits `Secure`. The Vercel rewrite
+keeps browser API calls same-origin when `VITE_API_URL` is empty. Unsafe API requests also require a signed CSRF
 header. Public registration always creates the `citizen` role. Issue status
 and alert status changes require an administrator on the server.
 The administrator sign-in page at `/admin/login` calls the dedicated
@@ -611,6 +611,10 @@ required for the secure session cookie. The existing Vercel `/api` rewrite
 keeps browser requests on the frontend origin; leave `VITE_API_URL` empty in
 Vercel so session cookies remain first-party. Keep the rewrite target aligned
 with the Render API hostname.
+If intentionally setting `VITE_API_URL` to the Render API, keep Render's
+`CORS_ORIGINS` limited to the exact Vercel origin and ensure `NODE_ENV=production`
+so the browser receives `SameSite=None; Secure` cookies. Browser third-party
+cookie restrictions can still block direct cross-site sessions.
 
 To provision the first administrator, register a normal citizen account, then
 have a trusted database operator run the following for that exact address:

@@ -47,14 +47,14 @@ test('authentication database failures return safe and distinct setup guidance',
   assert.equal(authDatabaseErrorMessage({ code: 'XX000', detail: 'sensitive internal detail' }, 'fallback'), 'fallback');
 });
 
-test('production session cookies use HTTPS-only and same-origin-safe flags', () => {
+test('production session cookies support cross-site fetch credentials securely', () => {
   const original = process.env.NODE_ENV;
   process.env.NODE_ENV = 'production';
   try {
     assert.match(cookieOptions(60), /HttpOnly/);
-    assert.match(cookieOptions(60), /SameSite=Lax/);
+    assert.match(cookieOptions(60), /Path=\/api/);
+    assert.match(cookieOptions(60), /SameSite=None/);
     assert.match(cookieOptions(60), /Secure/);
-    assert.match(cookieOptions(60), /HttpOnly/);
   } finally {
     process.env.NODE_ENV = original;
   }

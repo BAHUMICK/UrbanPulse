@@ -23,7 +23,8 @@ function authSecret() {
 
 function cookieOptions(maxAge) {
   const secure = process.env.NODE_ENV === 'production';
-  return `Path=/api; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
+  const sameSite = secure ? 'None' : 'Lax';
+  return `Path=/api; HttpOnly; SameSite=${sameSite}; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 }
 
 function readCookie(req, name) {
