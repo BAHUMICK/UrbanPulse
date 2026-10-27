@@ -169,9 +169,38 @@ WHERE NOT EXISTS (
     SELECT 1 FROM issues WHERE title = 'Clogged Storm Drain Causing Monsoon Waterlogging'
 );
 
+-- -----------------------------------------------------------------------------
+-- 8. IN-APP USER NOTIFICATIONS & ISSUE SUBSCRIPTIONS
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_notifications (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+    issue_id INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    notification_type VARCHAR(50) NOT NULL DEFAULT 'issue_resolved',
+    message TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_notifications_user_id ON user_notifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_notifications_unread ON user_notifications(user_id) WHERE is_read = FALSE;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_user_issue_resolution_notification
+    ON user_notifications(user_id, issue_id, notification_type);
+
+CREATE TABLE IF NOT EXISTS issue_subscriptions (
+    id BIGSERIAL PRIMARY KEY,
+    issue_id INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_issue_user_subscription UNIQUE(issue_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_issue_subscriptions_user ON issue_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_issue_subscriptions_issue ON issue_subscriptions(issue_id);
+
 -- =============================================================================
 -- VERIFICATION QUERIES (Optional: Run to confirm successful setup)
 -- =============================================================================
--- SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('issues', 'alerts', 'issue_evidence', 'app_users', 'auth_sessions');
+-- SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('issues', 'alerts', 'issue_evidence', 'app_users', 'auth_sessions', 'user_notifications', 'issue_subscriptions');
 -- SELECT count(*) AS seed_issues_count FROM issues;
 -- =============================================================================

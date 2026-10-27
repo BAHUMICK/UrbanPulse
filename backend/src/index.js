@@ -10,6 +10,7 @@ const alertRoutes = require('./routes/alertRoutes');
 const authRoutes = require('./routes/authRoutes');
 const { csrfProtection } = require('./middleware/auth');
 const evidenceRoutes = require('./routes/evidenceRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 const { parseAllowedOrigins, isAllowedOrigin } = require('./config/corsPolicy');
 
 const app = express();
@@ -45,6 +46,7 @@ app.use('/api', healthRoutes);
 app.use('/api', issueRoutes);
 app.use('/api', intelligenceRoutes);
 app.use('/api/alerts', alertRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api', evidenceRoutes);
 
 // Fallback for unmatched routes

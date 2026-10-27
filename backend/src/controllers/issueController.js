@@ -467,6 +467,8 @@ const createIssue = async (req, res) => {
  * Updates issue lifecycle status and cascades to linked municipal alerts.
  */
 const updateIssueStatus = async (req, res) => {
+  let client;
+  let transactionStarted = false;
   try {
     const issueId = Number(req.params.id);
     const { status } = req.body;
@@ -485,6 +487,28 @@ const updateIssueStatus = async (req, res) => {
       });
     }
 
+    client = await pool.connect();
+    await client.query('BEGIN');
+    transactionStarted = true;
+
+    // Check existing status before update to ensure idempotent resolution notification
+    const existingRes = await client.query(
+      'SELECT id, title, status, reporter_user_id FROM issues WHERE id = $1 FOR UPDATE',
+      [issueId]
+    );
+
+    if (existingRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      transactionStarted = false;
+      return res.status(404).json({
+        success: false,
+        message: 'Infrastructure issue not found.'
+      });
+    }
+
+    const existingIssue = existingRes.rows[0];
+    const previousStatus = existingIssue.status;
+
     const query = `
       UPDATE issues
       SET status = $1
@@ -499,22 +523,16 @@ const updateIssueStatus = async (req, res) => {
         longitude,
         severity,
         status,
-        created_at;
+        created_at,
+        reporter_user_id;
     `;
 
-    const result = await pool.query(query, [status, issueId]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Infrastructure issue not found.'
-      });
-    }
+    const result = await client.query(query, [status, issueId]);
 
     // Synchronize linked municipal alerts lifecycle with issue status
     if (status === 'Resolved') {
       try {
-        await pool.query(
+        await client.query(
           `UPDATE alerts SET status = 'Resolved' WHERE issue_id = $1 AND status != 'Resolved'`,
           [issueId]
         );
@@ -526,7 +544,7 @@ const updateIssueStatus = async (req, res) => {
       }
     } else if (status === 'In Progress') {
       try {
-        await pool.query(
+        await client.query(
           `UPDATE alerts SET status = 'Acknowledged' WHERE issue_id = $1 AND status = 'Active'`,
           [issueId]
         );
@@ -537,6 +555,49 @@ const updateIssueStatus = async (req, res) => {
         );
       }
     }
+
+    // In-app Issue Resolution Notifications
+    // Only notify when transitioning from an unresolved state to Resolved
+    if (status === 'Resolved' && previousStatus !== 'Resolved') {
+      const recipientIds = new Set();
+      if (existingIssue.reporter_user_id) {
+        recipientIds.add(Number(existingIssue.reporter_user_id));
+      }
+
+      // Check explicit issue followers/subscribers
+      try {
+        const subsRes = await client.query(
+          'SELECT user_id FROM issue_subscriptions WHERE issue_id = $1',
+          [issueId]
+        );
+        for (const sub of subsRes.rows) {
+          recipientIds.add(Number(sub.user_id));
+        }
+      } catch (subErr) {
+        // Table may not exist yet or no subscribers
+      }
+
+      for (const recipientId of recipientIds) {
+        const isReporter = Number(existingIssue.reporter_user_id) === recipientId;
+        const notificationMsg = isReporter
+          ? `Your reported issue, "${existingIssue.title}", has been marked as resolved.`
+          : `An issue you follow, "${existingIssue.title}", has been marked as resolved.`;
+
+        try {
+          await client.query(
+            `INSERT INTO user_notifications (user_id, issue_id, notification_type, message)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (user_id, issue_id, notification_type) DO NOTHING`,
+            [recipientId, issueId, 'issue_resolved', notificationMsg]
+          );
+        } catch (notifErr) {
+          console.error('Error recording resolution notification:', notifErr.message);
+        }
+      }
+    }
+
+    await client.query('COMMIT');
+    transactionStarted = false;
 
     // Fetch evidence to include in response
     const evQuery = `
@@ -558,12 +619,17 @@ const updateIssueStatus = async (req, res) => {
       data: updatedIssue
     });
   } catch (err) {
+    if (transactionStarted && client) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+    }
     console.error('Error updating issue status:', err);
 
     return res.status(500).json({
       success: false,
       message: 'Failed to update issue status',
     });
+  } finally {
+    client?.release();
   }
 };
 

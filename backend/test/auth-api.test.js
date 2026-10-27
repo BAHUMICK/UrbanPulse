@@ -12,6 +12,7 @@ const pool = require('../src/config/db');
 const { hashToken } = require('../src/middleware/auth');
 const users = new Map();
 const sessions = new Map();
+const notifications = new Map();
 let currentIssue = { id: 7, sector: 'Roads & Transportation', title: 'Test road damage', category: 'Road Damage', description: 'Road has a deep pothole', latitude: 22.5, longitude: 88.3, severity: 'High', status: 'Reported', reporter_user_id: 99, created_at: new Date().toISOString() };
 let createdIssue;
 const evidencePath = '/uploads/test-private-evidence.png';
@@ -68,6 +69,28 @@ pool.query = async (sql, values = []) => {
   if (query.startsWith("update alerts set status = 'resolved'")) return { rows: [] };
   if (query.startsWith('select id, file_name, file_path, file_type, file_size, created_at from issue_evidence')) return { rows: [] };
   if (query.startsWith('update alerts set status = $1')) return { rows: [{ id: Number(values[1]), issue_id: 7, alert_type: 'Road Infrastructure Alert', title: 'Test alert', message: 'Test', priority_score: 85, authority: 'Roads Department', status: values[0], created_at: new Date().toISOString() }] };
+  if (query.startsWith('select n.id, n.issue_id, n.notification_type')) {
+    const userNotifs = [...notifications.values()].filter((n) => Number(n.user_id) === Number(values[0]));
+    return { rows: userNotifs };
+  }
+  if (query.startsWith('select count(*)::int as unread_count from user_notifications')) {
+    const unread = [...notifications.values()].filter((n) => Number(n.user_id) === Number(values[0]) && !n.is_read).length;
+    return { rows: [{ unread_count: unread }] };
+  }
+  if (query.startsWith('update user_notifications set is_read = true where id = $1 and user_id = $2')) {
+    const notif = notifications.get(Number(values[0]));
+    if (notif && Number(notif.user_id) === Number(values[1])) {
+      notif.is_read = true;
+      return { rows: [{ id: notif.id, is_read: true }] };
+    }
+    return { rows: [] };
+  }
+  if (query.startsWith('update user_notifications set is_read = true where user_id = $1')) {
+    for (const notif of notifications.values()) {
+      if (Number(notif.user_id) === Number(values[0])) notif.is_read = true;
+    }
+    return { rows: [] };
+  }
   throw new Error(`Unexpected test query: ${query}`);
 };
 pool.connect = async () => {
@@ -107,6 +130,24 @@ pool.connect = async () => {
     }
     if (query.includes('from alerts where issue_id')) return { rows: [] };
     if (query.startsWith('select id, latitude, longitude, severity, status, category from issues')) return { rows: createdIssue ? [{ ...createdIssue }] : [] };
+    if (query.startsWith('select id, title, status, reporter_user_id from issues')) {
+      const target = Number(values[0]) === 7 ? currentIssue : (createdIssue && Number(createdIssue.id) === Number(values[0]) ? createdIssue : null);
+      return { rows: target ? [{ id: target.id, title: target.title, status: target.status, reporter_user_id: target.reporter_user_id }] : [] };
+    }
+    if (query.startsWith('update issues set status')) {
+      if (Number(values[1]) === 7) currentIssue = { ...currentIssue, status: values[0] };
+      else if (createdIssue && Number(createdIssue.id) === Number(values[1])) createdIssue = { ...createdIssue, status: values[0] };
+      const updated = Number(values[1]) === 7 ? currentIssue : createdIssue;
+      return { rows: updated ? [{ ...updated }] : [] };
+    }
+    if (query.startsWith("update alerts set status = 'resolved'")) return { rows: [] };
+    if (query.startsWith("update alerts set status = 'acknowledged'")) return { rows: [] };
+    if (query.startsWith('select user_id from issue_subscriptions')) return { rows: [] };
+    if (query.startsWith('insert into user_notifications')) {
+      const id = notifications.size + 1;
+      notifications.set(id, { id, user_id: values[0], issue_id: values[1], notification_type: values[2], message: values[3], is_read: false, created_at: new Date().toISOString() });
+      return { rows: [] };
+    }
     if (query.startsWith('insert into alerts')) return { rows: [{ id: 9, issue_id: values[0], alert_type: values[1], title: values[2], message: values[3], priority_score: values[4], authority: values[5], status: 'Active', created_at: new Date().toISOString() }] };
     throw new Error(`Unexpected test transaction query: ${query}`);
   },
@@ -280,9 +321,33 @@ test('auth API enforces roles and supports citizen sign-in/out and admin workflo
   assert.equal((await adminStatus.json()).data.status, 'In Progress');
   const adminAlert = await fetch(`${baseUrl}/api/alerts/7/status`, { method: 'PUT', headers: { ...csrfHeaders, cookie: sessionCookie }, body: JSON.stringify({ status: 'Acknowledged' }) });
   assert.equal(adminAlert.status, 200);
-  const resolvedIssue = await fetch(`${baseUrl}/api/issues/7/status`, { method: 'PUT', headers: { ...csrfHeaders, cookie: sessionCookie }, body: JSON.stringify({ status: 'Resolved' }) });
+  const resolvedIssue = await fetch(`${baseUrl}/api/issues/8/status`, { method: 'PUT', headers: { ...csrfHeaders, cookie: sessionCookie }, body: JSON.stringify({ status: 'Resolved' }) });
   assert.equal(resolvedIssue.status, 200);
   assert.equal((await resolvedIssue.json()).data.status, 'Resolved');
+
+  // Resolution notifications: Verify reporter received notification and unread count
+  const notifsResponse = await fetch(`${baseUrl}/api/notifications`, { headers: { cookie: sessionCookie } });
+  assert.equal(notifsResponse.status, 200);
+  const notifsData = await notifsResponse.json();
+  assert.equal(notifsData.data.length, 1);
+  assert.equal(notifsData.data[0].notification_type, 'issue_resolved');
+  assert.match(notifsData.data[0].message, /marked as resolved/i);
+
+  const unreadResponse = await fetch(`${baseUrl}/api/notifications/unread-count`, { headers: { cookie: sessionCookie } });
+  assert.equal(unreadResponse.status, 200);
+  assert.equal((await unreadResponse.json()).unreadCount, 1);
+
+  const markReadResponse = await fetch(`${baseUrl}/api/notifications/${notifsData.data[0].id}/read`, { method: 'PATCH', headers: { ...csrfHeaders, cookie: sessionCookie } });
+  assert.equal(markReadResponse.status, 200);
+  assert.equal((await markReadResponse.json()).data.is_read, true);
+
+  const afterReadUnread = await fetch(`${baseUrl}/api/notifications/unread-count`, { headers: { cookie: sessionCookie } });
+  assert.equal((await afterReadUnread.json()).unreadCount, 0);
+
+  // Updating an already-resolved issue does not produce duplicate notifications
+  const repeatResolved = await fetch(`${baseUrl}/api/issues/8/status`, { method: 'PUT', headers: { ...csrfHeaders, cookie: sessionCookie }, body: JSON.stringify({ status: 'Resolved' }) });
+  assert.equal(repeatResolved.status, 200);
+  assert.equal([...notifications.values()].filter((n) => Number(n.issue_id) === 8).length, 1);
 
   failNextSessionDelete = true;
   const failedLogout = await fetch(`${baseUrl}/api/auth/logout`, { method: 'POST', headers: { ...csrfHeaders, cookie: sessionCookie }, body: '{}' });

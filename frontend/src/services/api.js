@@ -269,3 +269,60 @@ export async function updateAlertStatus(alertId, status) {
 export async function checkBackendHealth() {
   return request('/health');
 }
+
+// =====================================================
+// IN-APP NOTIFICATIONS & ISSUE SUBSCRIPTIONS
+// =====================================================
+
+export async function getNotifications() {
+  try {
+    const result = await request('/notifications', { quiet: true });
+    return Array.isArray(result?.data) ? result.data : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getUnreadNotificationCount() {
+  try {
+    const result = await request('/notifications/unread-count', { quiet: true });
+    return typeof result?.unreadCount === 'number' ? result.unreadCount : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function markNotificationAsRead(notificationId) {
+  return request(`/notifications/${notificationId}/read`, {
+    method: 'PATCH'
+  });
+}
+
+export async function markAllNotificationsAsRead() {
+  return request('/notifications/mark-all-read', {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
+export async function subscribeToIssue(issueId) {
+  return request(`/notifications/issues/${issueId}/subscribe`, {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
+export async function unsubscribeFromIssue(issueId) {
+  return request(`/notifications/issues/${issueId}/subscribe`, {
+    method: 'DELETE'
+  });
+}
+
+export async function getIssueSubscriptionStatus(issueId) {
+  try {
+    const result = await request(`/notifications/issues/${issueId}/subscribe`, { quiet: true });
+    return Boolean(result?.subscribed);
+  } catch {
+    return false;
+  }
+}

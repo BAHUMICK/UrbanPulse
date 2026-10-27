@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import NotificationsDropdown from './NotificationsDropdown';
 import {
   IconRefresh,
   IconAlerts,
@@ -114,6 +115,9 @@ function Header({
             <span>{activeAlertCount} Active</span>
           </button>
         )}
+
+        {/* IN-APP NOTIFICATIONS */}
+        <NotificationsDropdown onNavigate={onNavigate} />
 
         {/* REFRESH BUTTON */}
         <button

@@ -5,57 +5,57 @@
 
 :root {
   /* Surface & Backgrounds */
-  --bg-app: #0d1211;
-  --bg-sidebar: #0b1211;
-  --bg-header: #121a18;
-  --bg-card: #151f1d;
-  --bg-card-hover: #1b2926;
-  --bg-card-inner: #101816;
-  --bg-input: #101917;
+  --bg-app: #101827;
+  --bg-sidebar: #0d1522;
+  --bg-header: #131f33;
+  --bg-card: #1e293b;
+  --bg-card-hover: #243347;
+  --bg-card-inner: #152238;
+  --bg-input: #0f172a;
 
   /* Borders & Dividers */
-  --border-subtle: #263531;
-  --border-card: #30433d;
-  --border-card-hover: #405b50;
-  --border-focus: #34d399;
+  --border-subtle: #334155;
+  --border-card: #334155;
+  --border-card-hover: #475569;
+  --border-focus: #38bdf8;
 
   /* Typography Colors */
   --text-primary: #f8fafc;
-  --text-secondary: #b8c5c1;
-  --text-muted: #8c9c97;
-  --text-dim: #71827c;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-dim: #475569;
 
   --font-ui: "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
   --radius-control: 8px;
   --radius-card: 12px;
-  --shadow-surface: 0 12px 30px rgba(0, 0, 0, 0.18);
+  --shadow-surface: 0 12px 30px rgba(0, 0, 0, 0.25);
 
   /* Accent Colors */
-  --accent-primary: #10b981;
-  --accent-hover: #059669;
-  --accent-cyan: #22d3ee;
-  --accent-glow: rgba(16, 185, 129, 0.16);
+  --accent-primary: #34d399;
+  --accent-hover: #10b981;
+  --accent-cyan: #38bdf8;
+  --accent-glow: rgba(56, 189, 248, 0.16);
 
   /* Semantic Severity Colors */
-  --color-critical: #ef4444;
-  --color-critical-bg: rgba(239, 68, 68, 0.12);
-  --color-critical-border: rgba(239, 68, 68, 0.35);
+  --color-critical: #fb7185;
+  --color-critical-bg: rgba(251, 113, 133, 0.12);
+  --color-critical-border: rgba(251, 113, 133, 0.35);
 
-  --color-high: #f97316;
-  --color-high-bg: rgba(249, 115, 22, 0.12);
-  --color-high-border: rgba(249, 115, 22, 0.35);
+  --color-high: #fb923c;
+  --color-high-bg: rgba(251, 146, 60, 0.12);
+  --color-high-border: rgba(251, 146, 60, 0.35);
 
-  --color-medium: #f59e0b;
-  --color-medium-bg: rgba(245, 158, 11, 0.12);
-  --color-medium-border: rgba(245, 158, 11, 0.35);
+  --color-medium: #fbbf24;
+  --color-medium-bg: rgba(251, 191, 36, 0.12);
+  --color-medium-border: rgba(251, 191, 36, 0.35);
 
-  --color-low: #10b981;
-  --color-low-bg: rgba(16, 185, 129, 0.12);
-  --color-low-border: rgba(16, 185, 129, 0.35);
+  --color-low: #34d399;
+  --color-low-bg: rgba(52, 211, 153, 0.12);
+  --color-low-border: rgba(52, 211, 153, 0.35);
 
   /* Status Colors */
-  --status-reported: #67d2d7;
-  --status-reported-bg: rgba(103, 210, 215, 0.12);
+  --status-reported: #38bdf8;
+  --status-reported-bg: rgba(56, 189, 248, 0.12);
 
   --status-inprogress: #fbbf24;
   --status-inprogress-bg: rgba(251, 191, 36, 0.12);
@@ -75,7 +75,7 @@
 .location-picker-map { width: 100%; height: 270px; border-radius: 8px; z-index: 0; }
 .location-picker .leaflet-container { background: #111d2b; }
 .location-picker-marker { background: transparent; border: 0; }
-.location-picker-marker span { display: block; width: 18px; height: 18px; border: 3px solid white; border-radius: 50% 50% 50% 0; background: #14a99a; box-shadow: 0 1px 8px #0009; transform: rotate(-45deg); }
+.location-picker-marker span { display: block; width: 18px; height: 18px; border: 3px solid white; border-radius: 50% 50% 50% 0; background: #38bdf8; box-shadow: 0 1px 8px #0009; transform: rotate(-45deg); }
 .location-coordinates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
 .location-coordinates label { display: grid; gap: 5px; color: var(--text-muted); font-size: 11px; }
 .location-coordinates input { min-width: 0; width: 100%; padding: 8px 10px; border: 1px solid var(--border-subtle); border-radius: 6px; background: var(--bg-input); color: var(--text-primary); }
@@ -102,7 +102,7 @@ body,
 
 body {
   font-family: var(--font-ui);
-  background: radial-gradient(ellipse at 78% 0%, rgba(31, 76, 84, 0.12), transparent 36%), var(--bg-app);
+  background: radial-gradient(ellipse at 78% 0%, rgba(56, 189, 248, 0.08), transparent 36%), var(--bg-app);
   color: var(--text-primary);
   font-size: 13.5px;
   line-height: 1.55;
@@ -121,12 +121,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #34475e;
+  background: #334155;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #49617b;
+  background: #475569;
 }
 
 button {
@@ -149,8 +149,8 @@ a {
 }
 
 ::selection {
-  color: #f5fffe;
-  background: rgba(16, 185, 129, 0.38);
+  color: #f8fafc;
+  background: rgba(56, 189, 248, 0.35);
 }
 
 :where(button, a, input, select, textarea, [tabindex]):focus-visible {
