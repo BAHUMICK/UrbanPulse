@@ -120,6 +120,9 @@ async function request(endpoint, options = {}) {
   } catch (error) {
     if (!quiet) console.error(`UrbanPulse API error [${endpoint}]:`, error.message);
     if (error.status) {
+      if (error.status === 403 && (error.message?.includes('verification failed') || error.message?.includes('CSRF'))) {
+        csrfToken = '';
+      }
       if (error.status === 401 && !['/auth/me', '/auth/login', '/auth/admin/login', '/auth/register'].includes(endpoint)) {
         window.dispatchEvent(new Event('urbanpulse:session-expired'));
       }

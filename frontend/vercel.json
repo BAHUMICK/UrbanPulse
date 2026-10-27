@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://YOUR_RENDER_SERVICE.onrender.com/api/:path*"
+      "destination": "https://urbanpulse-api-8u36.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
