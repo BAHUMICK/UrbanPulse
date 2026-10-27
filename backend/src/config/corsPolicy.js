@@ -1,4 +1,4 @@
-const PRODUCTION_FRONTEND_ORIGIN = 'https://urbanpulse-three.vercel.app';
+const PRODUCTION_FRONTEND_ORIGIN = process.env.PRODUCTION_FRONTEND_ORIGIN || 'https://urbanpulse-three.vercel.app';
 
 function parseAllowedOrigins(environment = process.env) {
   const fallbackOrigins = environment.NODE_ENV === 'production'

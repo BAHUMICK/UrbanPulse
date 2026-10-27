@@ -11,14 +11,19 @@ $env:PGPASSWORD = $plainPass
 Write-Host "`n[1/3] Creating 'urbanpulse' database..." -ForegroundColor Green
 & "D:\postgresql\bin\psql.exe" -U postgres -h localhost -c "CREATE DATABASE urbanpulse;"
 
-Write-Host "`n[2/3] Applying schema and inserting 3 seed records..." -ForegroundColor Green
+Write-Host "`n[2/4] Applying schema and inserting 3 seed records..." -ForegroundColor Green
 & "D:\postgresql\bin\psql.exe" -U postgres -h localhost -d urbanpulse -f "D:\UrbanPulse\database\schema.sql"
 
-Write-Host "`n[3/3] Running verification queries..." -ForegroundColor Green
+Write-Host "`n[3/4] Applying authentication and ownership migrations..." -ForegroundColor Green
+& "D:\postgresql\bin\psql.exe" -U postgres -h localhost -d urbanpulse -f "D:\UrbanPulse\database\migrations\001_authentication.sql"
+& "D:\postgresql\bin\psql.exe" -U postgres -h localhost -d urbanpulse -f "D:\UrbanPulse\database\migrations\002_issue_report_ownership.sql"
+
+Write-Host "`n[4/4] Running verification queries..." -ForegroundColor Green
 $verifyQuery = @"
 SELECT 'TABLE_EXISTS' AS check_type, table_name 
 FROM information_schema.tables 
-WHERE table_name = 'issues';
+WHERE table_name IN ('issues', 'alerts', 'issue_evidence', 'app_users', 'auth_sessions')
+ORDER BY table_name;
 
 SELECT column_name, data_type, is_nullable 
 FROM information_schema.columns 

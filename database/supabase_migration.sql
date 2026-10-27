@@ -72,7 +72,60 @@ CREATE TABLE IF NOT EXISTS issue_evidence (
 CREATE INDEX IF NOT EXISTS idx_issue_evidence_issue_id ON issue_evidence(issue_id);
 
 -- -----------------------------------------------------------------------------
--- 4. INITIAL SEED DATA (Idempotent: Inserts only if absent)
+-- 4. TABLE: app_users
+-- Stores authenticated citizen and administrator accounts.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS app_users (
+    id BIGSERIAL PRIMARY KEY,
+    email VARCHAR(254) NOT NULL,
+    password_hash TEXT NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'citizen' CHECK (role IN ('citizen', 'admin')),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_app_users_email_lower ON app_users (LOWER(email));
+
+-- -----------------------------------------------------------------------------
+-- 5. TABLE: auth_sessions
+-- Stores active session tokens for citizen and administrator authentication.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires_at ON auth_sessions(expires_at);
+
+-- -----------------------------------------------------------------------------
+-- 6. ISSUE REPORT OWNERSHIP
+-- Associates issues with their reporting user while preserving existing records.
+-- -----------------------------------------------------------------------------
+ALTER TABLE issues ADD COLUMN IF NOT EXISTS reporter_user_id BIGINT;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'fk_issues_reporter_user'
+          AND conrelid = 'issues'::regclass
+    ) THEN
+        ALTER TABLE issues
+            ADD CONSTRAINT fk_issues_reporter_user
+            FOREIGN KEY (reporter_user_id)
+            REFERENCES app_users(id)
+            ON DELETE SET NULL;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_issues_reporter_user_id ON issues(reporter_user_id);
+
+-- -----------------------------------------------------------------------------
+-- 7. INITIAL SEED DATA (Idempotent: Inserts only if absent)
 -- -----------------------------------------------------------------------------
 INSERT INTO issues (sector, title, category, description, latitude, longitude, severity, status)
 SELECT
@@ -119,6 +172,6 @@ WHERE NOT EXISTS (
 -- =============================================================================
 -- VERIFICATION QUERIES (Optional: Run to confirm successful setup)
 -- =============================================================================
--- SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('issues', 'alerts', 'issue_evidence');
+-- SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('issues', 'alerts', 'issue_evidence', 'app_users', 'auth_sessions');
 -- SELECT count(*) AS seed_issues_count FROM issues;
 -- =============================================================================

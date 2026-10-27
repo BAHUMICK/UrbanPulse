@@ -17,7 +17,8 @@ test('scrypt password hashes verify the password but never equal it', async () =
 test('CSRF tokens validate and reject tampering', () => {
   const token = createCsrfToken();
   assert.equal(validCsrfToken(token), true);
-  assert.equal(validCsrfToken(`${token.slice(0, -1)}0`), false);
+  const tampered = token.endsWith('0') ? `${token.slice(0, -1)}1` : `${token.slice(0, -1)}0`;
+  assert.equal(validCsrfToken(tampered), false);
   assert.equal(validCsrfToken(''), false);
 });
 
