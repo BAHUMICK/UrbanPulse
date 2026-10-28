@@ -117,6 +117,17 @@ test('resolveConfig respects priority: CLI arg > process.env > env file > discre
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+
+  // Case E: Explicit remote DATABASE_URL clears local DB_SSL=false conflict
+  const configE = resolveConfig(
+    { databaseUrl: 'postgresql://postgres:pass@db.xxxx.supabase.co:5432/postgres' },
+    { DB_SSL: 'false' }
+  );
+  assert.equal(configE.env.DATABASE_URL, 'postgresql://postgres:pass@db.xxxx.supabase.co:5432/postgres');
+  assert.equal(configE.env.DB_SSL, undefined);
+  const { poolConfig, safeDiagnostics } = defaultPool.buildPoolConfig(configE.env);
+  assert.equal(safeDiagnostics.sslEnabled, true);
+  assert.equal(poolConfig.ssl.rejectUnauthorized, true);
 });
 
 test('safe diagnostics report host, port, db, ssl without exposing credentials', () => {

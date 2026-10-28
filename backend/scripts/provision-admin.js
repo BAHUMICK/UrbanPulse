@@ -105,11 +105,20 @@ function resolveConfig(args, baseEnv = process.env) {
   if (args.databaseUrl) {
     env.DATABASE_URL = args.databaseUrl;
     configSource = '--database-url argument';
+    if (env.DB_SSL === 'false') {
+      delete env.DB_SSL;
+    }
   } else if (baseEnv.DATABASE_URL) {
     env.DATABASE_URL = baseEnv.DATABASE_URL;
     configSource = 'DATABASE_URL environment variable';
+    if (env.DB_SSL === 'false' && baseEnv.DB_SSL === undefined) {
+      delete env.DB_SSL;
+    }
   } else if (env.DATABASE_URL) {
     configSource = `${configSource} (DATABASE_URL)`;
+    if (env.DB_SSL === 'false') {
+      delete env.DB_SSL;
+    }
   } else {
     configSource = `${configSource} (discrete parameters)`;
   }
