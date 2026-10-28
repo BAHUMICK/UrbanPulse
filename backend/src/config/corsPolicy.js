@@ -34,7 +34,9 @@ function parseAllowedOrigins(environment = process.env) {
         .filter(Boolean)
     : [];
 
-  const raw = configured.length > 0 ? configured : fallbackOrigins;
+  // CORS_ORIGINS may add deployment-specific origins, but must not accidentally
+  // disable the repository's explicitly trusted UrbanPulse frontends/previews.
+  const raw = [...fallbackOrigins, ...configured];
   return Array.from(new Set(raw.filter(Boolean)));
 }
 

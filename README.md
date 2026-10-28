@@ -601,9 +601,10 @@ Set `AUTH_SECRET` in the backend environment to a newly generated random value
 of at least 32 bytes. For example, locally run
 `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
 and copy the result into the private environment configuration; never commit it.
-Set `CORS_ORIGINS` to a comma-separated list of exact frontend origins. Include
-the production Vercel origin and any specific preview origin that the Render
-service must accept; wildcard preview origins are not accepted. Vercel rewrites
+Set `CORS_ORIGINS` to a comma-separated list of additional exact frontend
+origins when a deployment needs origins beyond the trusted UrbanPulse Vercel
+domains and previews. The backend always retains those built-in trusted origins;
+the setting adds deployment-specific origins. Vercel rewrites
 keep the browser URL same-origin, but verify whether the proxy forwards the
 browser `Origin` header and allow the exact preview origin if it does. In
 production, HTTPS is

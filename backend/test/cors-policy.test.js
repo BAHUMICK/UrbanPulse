@@ -15,6 +15,7 @@ test('production CORS fallback admits project domains and vercel previews while 
   assert.equal(isAllowedOrigin(PRODUCTION_FRONTEND_ORIGIN, allowed), true);
   assert.equal(isAllowedOrigin('https://urban-pulse-bahumick1-9202.vercel.app', allowed), true);
   assert.equal(isAllowedOrigin('https://urban-pulse-1jj70e19w-bahumick1-9202.vercel.app', allowed), true);
+  assert.equal(isAllowedOrigin('https://urban-pulse-j58rsecnv-bahumick1-9202.vercel.app', allowed), true);
   assert.equal(isAllowedOrigin('https://urban-pulse-git-main-bahumick1-9202.vercel.app', allowed), true);
   assert.equal(isAllowedOrigin('https://urbanpulse-three.vercel.app', allowed), true);
   assert.equal(isAllowedOrigin('https://urbanpulse-git-feature.vercel.app', allowed), false);
@@ -31,10 +32,12 @@ test('matchesPattern accurately matches wildcard segments without escaping or in
 });
 
 test('configured CORS origins are split, trimmed, and matched exactly', () => {
-  const allowed = parseAllowedOrigins({ CORS_ORIGINS: ' https://app.example , https://preview.example ' });
-  assert.deepEqual(allowed, ['https://app.example', 'https://preview.example']);
+  const allowed = parseAllowedOrigins({ NODE_ENV: 'production', CORS_ORIGINS: ' https://app.example , https://preview.example ' });
+  assert.deepEqual(allowed, [...DEFAULT_PRODUCTION_ORIGINS, 'https://app.example', 'https://preview.example']);
   assert.equal(isAllowedOrigin('https://preview.example', allowed), true);
   assert.equal(isAllowedOrigin('https://sub.preview.example', allowed), false);
+  assert.equal(isAllowedOrigin('https://urban-pulse-j58rsecnv-bahumick1-9202.vercel.app', allowed), true);
+  assert.equal(isAllowedOrigin('https://untrusted.example', allowed), false);
   assert.equal(isAllowedOrigin(undefined, allowed), true);
 });
 
@@ -43,9 +46,10 @@ test('CORS origins with trailing slashes or quotes are cleaned and matched resil
   assert.equal(cleanOrigin(" 'https://app.example///' "), 'https://app.example');
 
   const allowed = parseAllowedOrigins({
+    NODE_ENV: 'production',
     CORS_ORIGINS: ' "https://app.example/" , \'https://preview.example/\' ',
   });
-  assert.deepEqual(allowed, ['https://app.example', 'https://preview.example']);
+  assert.deepEqual(allowed, [...DEFAULT_PRODUCTION_ORIGINS, 'https://app.example', 'https://preview.example']);
 
   // Incoming origin with trailing slash should match cleaned origin
   assert.equal(isAllowedOrigin('https://app.example/', allowed), true);

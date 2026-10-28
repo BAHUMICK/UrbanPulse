@@ -166,16 +166,23 @@ test('auth API enforces roles and supports citizen sign-in/out and admin workflo
   baseUrl = `http://127.0.0.1:${server.address().port}`;
   t.after(async () => { server.closeAllConnections?.(); await new Promise((resolve) => server.close(resolve)); });
 
-  const preflight = await fetch(`${baseUrl}/api/auth/csrf`, { method: 'OPTIONS', headers: { origin: 'https://urbanpulse-three.vercel.app', 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type,x-csrf-token' } });
+  const previewOrigin = 'https://urban-pulse-j58rsecnv-bahumick1-9202.vercel.app';
+  const preflight = await fetch(`${baseUrl}/api/auth/csrf`, { method: 'OPTIONS', headers: { origin: previewOrigin, 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type,x-csrf-token' } });
   assert.equal(preflight.status, 204);
-  assert.equal(preflight.headers.get('access-control-allow-origin'), 'https://urbanpulse-three.vercel.app');
+  assert.equal(preflight.headers.get('access-control-allow-origin'), previewOrigin);
   assert.equal(preflight.headers.get('access-control-allow-credentials'), 'true');
+  const rejectedPreflight = await fetch(`${baseUrl}/api/auth/csrf`, { method: 'OPTIONS', headers: { origin: 'https://untrusted.example', 'access-control-request-method': 'POST' } });
+  assert.equal(rejectedPreflight.status, 403);
   const rejectedOrigin = await fetch(`${baseUrl}/api/health`, { headers: { origin: 'https://untrusted.example' } });
   assert.equal(rejectedOrigin.status, 403);
   const health = await fetch(`${baseUrl}/api/health`).then((response) => response.json());
   assert.equal(health.status, 'UP');
 
-  const csrfResult = await fetch(`${baseUrl}/api/auth/csrf`).then((response) => response.json());
+  const csrfResponse = await fetch(`${baseUrl}/api/auth/csrf`, { headers: { origin: previewOrigin } });
+  assert.equal(csrfResponse.status, 200);
+  assert.equal(csrfResponse.headers.get('access-control-allow-origin'), previewOrigin);
+  assert.equal(csrfResponse.headers.get('access-control-allow-credentials'), 'true');
+  const csrfResult = await csrfResponse.json();
   const csrf = csrfResult.token;
   const csrfHeaders = { 'content-type': 'application/json', 'x-csrf-token': csrf };
 
