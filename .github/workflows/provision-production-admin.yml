@@ -218,7 +218,10 @@ jobs:
               return;
             }
             if (process.env.OPERATION === 'check') fs.writeFileSync('check.json', JSON.stringify(output));
-          })().catch(reportSafeFailure);
+          })().catch((error) => {
+            reportSafeFailure(error);
+            process.exitCode = 1;
+          });
           NODE
 
       - name: Save successful check-only evidence
