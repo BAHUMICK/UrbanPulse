@@ -35,6 +35,53 @@ const REQUIRED_TABLES = [
   'user_notifications',
   'issue_subscriptions',
 ];
+const CONNECTION_ERROR_CODES = new Set([
+  'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNRESET', 'EHOSTUNREACH',
+  'EPIPE', 'EAI_AGAIN', '57P03', '28P01', '3D000',
+]);
+
+function safeErrorCode(error) {
+  const code = error?.code;
+  return typeof code === 'string' && (/^[A-Z0-9]{5}$/.test(code) || /^E[A-Z0-9_]{1,32}$/.test(code))
+    ? code
+    : null;
+}
+
+function getSafeCheckDiagnostic(error) {
+  const allowedCategories = new Set([
+    'database_configuration', 'database_connection', 'missing_tables',
+    'schema_inconclusive', 'unexpected',
+  ]);
+  const supplied = error?.provisioningDiagnostic;
+  const category = allowedCategories.has(supplied?.category) ? supplied.category : null;
+  const code = safeErrorCode(error) || safeErrorCode({ code: supplied?.code });
+
+  if (category) {
+    const diagnostic = { category };
+    if (code) diagnostic.code = code;
+    if (category === 'missing_tables') {
+      diagnostic.missingTables = Array.isArray(supplied.missingTables)
+        ? supplied.missingTables.filter((table) => REQUIRED_TABLES.includes(table))
+        : [];
+    }
+    return diagnostic;
+  }
+
+  if (code && (CONNECTION_ERROR_CODES.has(code) || code.startsWith('08'))) {
+    return { category: 'database_connection', code };
+  }
+  if (code === '42P01') return { category: 'missing_tables', code, missingTables: [] };
+  if (code && /^[A-Z0-9]{5}$/.test(code)) return { category: 'schema_inconclusive', code };
+  return { category: 'unexpected' };
+}
+
+function getSafeAccountStatus(result) {
+  const status = ['NOT_FOUND', 'EXISTS', 'EXISTS_ADMIN', 'ROLE_CHANGE_BLOCKED'].includes(result?.status)
+    ? result.status
+    : 'UNKNOWN';
+  const role = ['admin', 'citizen'].includes(result?.user?.role) ? result.user.role : 'unknown';
+  return { status, role };
+}
 
 function parseArgs(argv) {
   const flags = {
@@ -161,13 +208,14 @@ async function provisionAdmin(options = {}) {
 
   const args = parseArgs(argv);
 
-  const handleError = (message, code = 1) => {
+  const handleError = (message, code = 1, provisioningDiagnostic = null) => {
     logger.error(message);
     if (exitOnError) {
       process.exit(code);
     }
     const err = new Error(typeof message === 'string' ? message : message.message || 'Provisioning error');
     err.code = code;
+    if (provisioningDiagnostic) err.provisioningDiagnostic = provisioningDiagnostic;
     throw err;
   };
 
@@ -197,7 +245,7 @@ async function provisionAdmin(options = {}) {
     poolConfig = built.poolConfig;
     safeDiagnostics = built.safeDiagnostics;
   } catch (err) {
-    return handleError(`Configuration Error: ${err.message}`);
+    return handleError('Database configuration is missing or invalid.', 1, { category: 'database_configuration' });
   }
 
   // Display safe, non-secret connection diagnostics
@@ -223,7 +271,9 @@ async function provisionAdmin(options = {}) {
     try {
       schemaCheck = await verifyDatabaseTables(pool);
     } catch (dbErr) {
-      return handleError(`Connection failed to database at ${safeDiagnostics.targetHost}:${safeDiagnostics.targetPort}: ${dbErr.message}`);
+      const diagnostic = getSafeCheckDiagnostic(dbErr);
+      const category = diagnostic.category === 'database_connection' ? 'database_connection' : 'schema_inconclusive';
+      return handleError('Could not inspect the required database schema.', 1, { category, code: diagnostic.code });
     }
 
     logger.log('Database Schema Verification:');
@@ -242,21 +292,36 @@ async function provisionAdmin(options = {}) {
       } else {
         logger.error(`Ensure database migrations (database/supabase_migration.sql) have been executed on ${safeDiagnostics.targetHost}.`);
       }
-      return handleError('Missing required table: app_users');
+      return handleError('Required authentication table is missing.', 1, { category: 'missing_tables', missingTables: ['app_users'] });
     }
 
     if (!schemaCheck.allTablesPresent) {
       const missingTables = Object.entries(schemaCheck.tableStatus)
         .filter(([, present]) => !present)
         .map(([table]) => table);
-      return handleError(`Missing required tables: ${missingTables.join(', ')}`);
+      return handleError('One or more required tables are missing.', 1, { category: 'missing_tables', missingTables });
     }
 
     // 2. Check existing account
-    const existingResult = await pool.query(
-      'SELECT id, email, role, created_at FROM app_users WHERE LOWER(email) = $1',
-      [normalizedEmail]
-    );
+    let existingResult;
+    try {
+      existingResult = await pool.query(
+        'SELECT id, email, role, created_at FROM app_users WHERE LOWER(email) = $1',
+        [normalizedEmail]
+      );
+    } catch (dbErr) {
+      const diagnostic = getSafeCheckDiagnostic(dbErr);
+      const category = diagnostic.category === 'database_connection'
+        ? 'database_connection'
+        : diagnostic.category === 'missing_tables'
+          ? 'missing_tables'
+          : 'schema_inconclusive';
+      return handleError('Could not look up the requested account.', 1, {
+        category,
+        code: diagnostic.code,
+        ...(category === 'missing_tables' ? { missingTables: ['app_users'] } : {}),
+      });
+    }
     const existingUser = existingResult.rows[0];
 
     if (args.checkOnly) {
@@ -341,7 +406,7 @@ async function provisionAdmin(options = {}) {
       logger.error('Error: Table "app_users" does not exist in target database.');
       logger.error('Apply database/migrations/001_authentication.sql or database/supabase_migration.sql first.');
     } else {
-      logger.error('Provisioning failed:', error.code || error.message);
+      logger.error('Provisioning failed:', safeErrorCode(error) || 'unexpected error');
     }
     if (exitOnError) {
       process.exit(1);
@@ -368,6 +433,8 @@ module.exports = {
   resolveConfig,
   verifyDatabaseTables,
   provisionAdmin,
+  getSafeCheckDiagnostic,
+  getSafeAccountStatus,
   PASSWORD_BYTES_MIN,
   PASSWORD_BYTES_MAX,
   REQUIRED_TABLES,

@@ -169,21 +169,56 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const fs = require('node:fs');
-          const { provisionAdmin, REQUIRED_TABLES } = require('./backend/scripts/provision-admin');
+          const { provisionAdmin, REQUIRED_TABLES, getSafeCheckDiagnostic, getSafeAccountStatus } = require('./backend/scripts/provision-admin');
           const quietLogger = { log() {}, warn() {}, error() {} };
+          function reportSafeFailure(error) {
+            const diagnostic = getSafeCheckDiagnostic(error);
+            const code = diagnostic.code ? ` (code ${diagnostic.code})` : '';
+            if (diagnostic.category === 'database_connection') {
+              console.error(`Read-only check failed: database connection/configuration failure${code}. Verify the configured database secret, network reachability, and TLS settings; no secret values were logged.`);
+            } else if (diagnostic.category === 'missing_tables') {
+              const tables = diagnostic.missingTables || [];
+              console.error(tables.length
+                ? `Read-only check failed: required table(s) missing: ${tables.join(', ')}. Verify the additive migrations on the target database.`
+                : `Read-only check failed: the database reported a missing relation${code}. Verify the required schema tables and migrations.`);
+            } else if (diagnostic.category === 'schema_inconclusive') {
+              console.error(`Read-only check failed: schema inspection was inconclusive${code}. Verify table visibility and database permissions, then retry.`);
+            } else if (diagnostic.category === 'database_configuration') {
+              console.error('Read-only check failed: database configuration is missing or invalid. Verify the repository secret and TLS settings without printing their values.');
+            } else {
+              console.error(`Read-only check failed unexpectedly${code}. No account changes were made; inspect this step's sanitized diagnostics.`);
+            }
+          }
           (async () => {
             const result = await provisionAdmin({ argv: ['bahumick2009@gamil.com', '--check-only'], logger: quietLogger, exitOnError: false });
-            const present = result.schemaCheck && REQUIRED_TABLES.every(table => result.schemaCheck.tableStatus?.[table] === true);
-            if (!present || result.schemaCheck.allTablesPresent !== true || Object.keys(result.schemaCheck.tableStatus || {}).length !== REQUIRED_TABLES.length) {
-              throw new Error('Required schema is missing or inconclusive; creation is blocked.');
+            if (!result.schemaCheck || !result.schemaCheck.tableStatus || typeof result.schemaCheck.allTablesPresent !== 'boolean') {
+              console.error('Read-only check failed: schema inspection returned an inconclusive result. Verify database permissions and retry.');
+              process.exitCode = 1;
+              return;
+            }
+            const missingTables = REQUIRED_TABLES.filter(table => result.schemaCheck.tableStatus[table] !== true);
+            if (missingTables.length || result.schemaCheck.allTablesPresent !== true || Object.keys(result.schemaCheck.tableStatus).length !== REQUIRED_TABLES.length) {
+              if (missingTables.length) {
+                console.error(`Read-only check failed: required table(s) missing: ${missingTables.join(', ')}. Verify the additive migrations on the target database.`);
+              } else {
+                console.error('Read-only check failed: schema inspection was inconclusive. Verify the database table list and permissions.');
+              }
+              process.exitCode = 1;
+              return;
             }
             const output = { operation: process.env.OPERATION, runId: Number(process.env.CURRENT_RUN_ID), headSha: process.env.CURRENT_SHA, email: 'bahumick2009@gamil.com', accountStatus: result.status, role: result.user?.role || null, allRequiredTablesPresent: true, requiredTables: result.schemaCheck.tableStatus, targetHost: result.safeDiagnostics.targetHost, targetDatabase: result.safeDiagnostics.targetDatabase, projectRef: (process.env.PROJECT_REF || '').toLowerCase() };
+            const account = getSafeAccountStatus(result);
+            output.accountStatus = account.status;
+            output.role = account.role;
             console.log(JSON.stringify(output));
             fs.appendFileSync(process.env.GITHUB_OUTPUT, `status=${result.status}\nall_tables=true\n`);
-            if (process.env.OPERATION === 'create' && result.status !== 'NOT_FOUND') throw new Error('Creation stopped: account is not absent; no existing account will be modified.');
-            if (process.env.OPERATION === 'check' && result.status !== 'NOT_FOUND') throw new Error('Check did not confirm account absence; no creation artifact will be produced.');
+            if (account.status !== 'NOT_FOUND') {
+              console.error(`Read-only check found an unexpected account status: ${account.status} (role ${account.role}); expected NOT_FOUND. No account changes were made.`);
+              process.exitCode = 1;
+              return;
+            }
             if (process.env.OPERATION === 'check') fs.writeFileSync('check.json', JSON.stringify(output));
-          })().catch(() => { console.error('Read-only account/schema check failed or was inconclusive.'); process.exitCode = 1; });
+          })().catch(reportSafeFailure);
           NODE
 
       - name: Save successful check-only evidence

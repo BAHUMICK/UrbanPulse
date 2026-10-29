@@ -9,6 +9,8 @@ const {
   resolveConfig,
   verifyDatabaseTables,
   provisionAdmin,
+  getSafeCheckDiagnostic,
+  getSafeAccountStatus,
   REQUIRED_TABLES,
 } = require('../scripts/provision-admin');
 const defaultPool = require('../src/config/db');
@@ -174,6 +176,34 @@ test('verifyDatabaseTables identifies present and missing tables', async () => {
   assert.equal(resMissing.tableStatus['issues'], true);
 });
 
+test('safe check diagnostics classify failures and never include raw error messages', () => {
+  const connectionError = new Error('postgresql://user:private-password@db.example.invalid/private-db');
+  connectionError.code = 'ECONNREFUSED';
+  const connectionDiagnostic = getSafeCheckDiagnostic(connectionError);
+  assert.deepEqual(connectionDiagnostic, { category: 'database_connection', code: 'ECONNREFUSED' });
+  assert.equal(JSON.stringify(connectionDiagnostic).includes('private-password'), false);
+
+  const missingTablesError = new Error('sensitive driver message');
+  missingTablesError.provisioningDiagnostic = {
+    category: 'missing_tables',
+    missingTables: ['auth_sessions', 'not_a_required_table'],
+    code: '42P01',
+  };
+  const missingTablesDiagnostic = getSafeCheckDiagnostic(missingTablesError);
+  assert.deepEqual(missingTablesDiagnostic, {
+    category: 'missing_tables',
+    code: '42P01',
+    missingTables: ['auth_sessions'],
+  });
+  assert.equal(JSON.stringify(missingTablesDiagnostic).includes('sensitive driver message'), false);
+
+  const schemaError = new Error('another private driver message');
+  schemaError.code = '42501';
+  assert.deepEqual(getSafeCheckDiagnostic(schemaError), { category: 'schema_inconclusive', code: '42501' });
+  assert.deepEqual(getSafeAccountStatus({ status: 'EXISTS', user: { role: 'citizen' } }), { status: 'EXISTS', role: 'citizen' });
+  assert.deepEqual(getSafeAccountStatus({ status: 'untrusted status', user: { role: 'root' } }), { status: 'UNKNOWN', role: 'unknown' });
+});
+
 test('provisionAdmin stops with clear diagnostic guidance when app_users is missing', async () => {
   const logged = [];
   const errors = [];
@@ -202,12 +232,36 @@ test('provisionAdmin stops with clear diagnostic guidance when app_users is miss
         logger: mockLogger,
         exitOnError: false,
       }),
-    /Missing required table: app_users/
+    /Required authentication table is missing/
   );
 
   const errorOutput = errors.join('\n');
   assert.match(errorOutput, /Table "app_users" does not exist in target database/);
   assert.match(errorOutput, /--database-url/);
+});
+
+test('provisionAdmin surfaces a safe database-connection diagnostic without raw driver details', async () => {
+  const privateDriverMessage = 'postgresql://test:private-password@db.example.invalid/private-db';
+  const logged = [];
+  const mockPool = {
+    query: async () => {
+      const error = new Error(privateDriverMessage);
+      error.code = 'ECONNREFUSED';
+      throw error;
+    },
+    end: async () => {},
+  };
+  const failure = await provisionAdmin({
+    argv: ['new-admin@example.test', '--check-only'],
+    baseEnv: { DATABASE_URL: 'postgresql://test:test@db.example.invalid:5432/testdb' },
+    injectedPool: mockPool,
+    logger: { log: (...args) => logged.push(args.join(' ')), warn: () => {}, error: (...args) => logged.push(args.join(' ')) },
+    exitOnError: false,
+  }).then(() => assert.fail('Connection failure should stop the check.'), (error) => error);
+
+  assert.deepEqual(getSafeCheckDiagnostic(failure), { category: 'database_connection', code: 'ECONNREFUSED' });
+  assert.equal(failure.message.includes(privateDriverMessage), false);
+  assert.equal(logged.join('\n').includes(privateDriverMessage), false);
 });
 
 test('provisionAdmin fails closed when any declared required table is missing', async () => {
@@ -226,15 +280,17 @@ test('provisionAdmin fails closed when any declared required table is missing', 
     end: async () => {},
   };
 
-  await assert.rejects(
-    () => provisionAdmin({
+  const failure = await provisionAdmin({
       argv: ['new-admin@example.test', '--password=one-time-admin-password'],
       injectedPool: mockPool,
       logger: { log() {}, warn() {}, error() {} },
       exitOnError: false,
-    }),
-    /Missing required tables: auth_sessions/
-  );
+    }).then(() => assert.fail('Missing required tables should stop provisioning.'), (error) => error);
+  assert.match(failure.message, /One or more required tables are missing/);
+  assert.deepEqual(getSafeCheckDiagnostic(failure), {
+    category: 'missing_tables',
+    missingTables: ['auth_sessions'],
+  });
   assert.equal(accountLookupPerformed, false);
   assert.equal(accountWritePerformed, false);
 });
