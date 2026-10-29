@@ -200,6 +200,10 @@ test('safe check diagnostics classify failures and never include raw error messa
   const schemaError = new Error('another private driver message');
   schemaError.code = '42501';
   assert.deepEqual(getSafeCheckDiagnostic(schemaError), { category: 'schema_inconclusive', code: '42501' });
+  schemaError.provisioningDiagnostic = { category: 'schema_inconclusive', stage: 'schema_inspection' };
+  assert.deepEqual(getSafeCheckDiagnostic(schemaError), { category: 'schema_inconclusive', code: '42501', stage: 'schema_inspection' });
+  schemaError.provisioningDiagnostic.stage = 'untrusted_stage';
+  assert.deepEqual(getSafeCheckDiagnostic(schemaError), { category: 'schema_inconclusive', code: '42501' });
   assert.deepEqual(getSafeAccountStatus({ status: 'EXISTS', user: { role: 'citizen' } }), { status: 'EXISTS', role: 'citizen' });
   assert.deepEqual(getSafeAccountStatus({ status: 'untrusted status', user: { role: 'root' } }), { status: 'UNKNOWN', role: 'unknown' });
 });
@@ -259,9 +263,66 @@ test('provisionAdmin surfaces a safe database-connection diagnostic without raw 
     exitOnError: false,
   }).then(() => assert.fail('Connection failure should stop the check.'), (error) => error);
 
-  assert.deepEqual(getSafeCheckDiagnostic(failure), { category: 'database_connection', code: 'ECONNREFUSED' });
+  assert.deepEqual(getSafeCheckDiagnostic(failure), {
+    category: 'database_connection',
+    code: 'ECONNREFUSED',
+    stage: 'schema_inspection',
+  });
   assert.equal(failure.message.includes(privateDriverMessage), false);
   assert.equal(logged.join('\n').includes(privateDriverMessage), false);
+});
+
+test('provisionAdmin identifies schema-inspection failures without exposing raw errors', async () => {
+  const privateDriverMessage = 'permission failure with private connection details';
+  const mockPool = {
+    query: async () => {
+      const error = new Error(privateDriverMessage);
+      error.code = '42501';
+      throw error;
+    },
+    end: async () => {},
+  };
+  const failure = await provisionAdmin({
+    argv: ['new-admin@example.test', '--check-only'],
+    baseEnv: { DATABASE_URL: 'postgresql://test:test@db.example.invalid:5432/testdb' },
+    injectedPool: mockPool,
+    logger: { log() {}, warn() {}, error() {} },
+    exitOnError: false,
+  }).then(() => assert.fail('Schema inspection failure should stop the check.'), (error) => error);
+
+  assert.deepEqual(getSafeCheckDiagnostic(failure), {
+    category: 'schema_inconclusive',
+    code: '42501',
+    stage: 'schema_inspection',
+  });
+  assert.equal(failure.message.includes(privateDriverMessage), false);
+});
+
+test('provisionAdmin distinguishes account-lookup failures from schema failures', async () => {
+  const privateDriverMessage = 'account query failed with private connection details';
+  const mockPool = {
+    query: async (sql) => {
+      if (sql.includes('information_schema.tables')) {
+        return { rows: REQUIRED_TABLES.map((table_name) => ({ table_name })) };
+      }
+      const error = new Error(privateDriverMessage);
+      throw error;
+    },
+    end: async () => {},
+  };
+  const failure = await provisionAdmin({
+    argv: ['new-admin@example.test', '--check-only'],
+    baseEnv: { DATABASE_URL: 'postgresql://test:test@db.example.invalid:5432/testdb' },
+    injectedPool: mockPool,
+    logger: { log() {}, warn() {}, error() {} },
+    exitOnError: false,
+  }).then(() => assert.fail('Account lookup failure should stop the check.'), (error) => error);
+
+  assert.deepEqual(getSafeCheckDiagnostic(failure), {
+    category: 'schema_inconclusive',
+    stage: 'account_lookup',
+  });
+  assert.equal(failure.message.includes(privateDriverMessage), false);
 });
 
 test('provisionAdmin fails closed when any declared required table is missing', async () => {

@@ -182,7 +182,11 @@ jobs:
                 ? `Read-only check failed: required table(s) missing: ${tables.join(', ')}. Verify the additive migrations on the target database.`
                 : `Read-only check failed: the database reported a missing relation${code}. Verify the required schema tables and migrations.`);
             } else if (diagnostic.category === 'schema_inconclusive') {
-              console.error(`Read-only check failed: schema inspection was inconclusive${code}. Verify table visibility and database permissions, then retry.`);
+              if (diagnostic.stage === 'account_lookup') {
+                console.error(`Read-only check failed: account lookup was inconclusive${code}. Verify the read permission for public.app_users, then retry.`);
+              } else {
+                console.error(`Read-only check failed: schema inspection was inconclusive${code}. Verify table visibility and database permissions, then retry.`);
+              }
             } else if (diagnostic.category === 'database_configuration') {
               console.error('Read-only check failed: database configuration is missing or invalid. Verify the repository secret and TLS settings without printing their values.');
             } else {

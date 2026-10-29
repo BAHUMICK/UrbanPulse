@@ -59,6 +59,10 @@ function getSafeCheckDiagnostic(error) {
   if (category) {
     const diagnostic = { category };
     if (code) diagnostic.code = code;
+    const stage = ['schema_inspection', 'account_lookup'].includes(supplied?.stage)
+      ? supplied.stage
+      : null;
+    if (stage) diagnostic.stage = stage;
     if (category === 'missing_tables') {
       diagnostic.missingTables = Array.isArray(supplied.missingTables)
         ? supplied.missingTables.filter((table) => REQUIRED_TABLES.includes(table))
@@ -273,7 +277,11 @@ async function provisionAdmin(options = {}) {
     } catch (dbErr) {
       const diagnostic = getSafeCheckDiagnostic(dbErr);
       const category = diagnostic.category === 'database_connection' ? 'database_connection' : 'schema_inconclusive';
-      return handleError('Could not inspect the required database schema.', 1, { category, code: diagnostic.code });
+      return handleError('Could not inspect the required database schema.', 1, {
+        category,
+        code: diagnostic.code,
+        stage: 'schema_inspection',
+      });
     }
 
     logger.log('Database Schema Verification:');
@@ -319,6 +327,7 @@ async function provisionAdmin(options = {}) {
       return handleError('Could not look up the requested account.', 1, {
         category,
         code: diagnostic.code,
+        stage: 'account_lookup',
         ...(category === 'missing_tables' ? { missingTables: ['app_users'] } : {}),
       });
     }
