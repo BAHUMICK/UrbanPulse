@@ -245,6 +245,13 @@ async function provisionAdmin(options = {}) {
       return handleError('Missing required table: app_users');
     }
 
+    if (!schemaCheck.allTablesPresent) {
+      const missingTables = Object.entries(schemaCheck.tableStatus)
+        .filter(([, present]) => !present)
+        .map(([table]) => table);
+      return handleError(`Missing required tables: ${missingTables.join(', ')}`);
+    }
+
     // 2. Check existing account
     const existingResult = await pool.query(
       'SELECT id, email, role, created_at FROM app_users WHERE LOWER(email) = $1',

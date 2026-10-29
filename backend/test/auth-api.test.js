@@ -254,6 +254,12 @@ test('auth API enforces roles and supports citizen sign-in/out and admin workflo
   const sessionCookie = login.headers.get('set-cookie').split(';')[0];
   assert.equal((await fetch(`${baseUrl}/api/auth/me`, { headers: { cookie: sessionCookie } }).then((response) => response.json())).data.role, 'citizen');
 
+  const nonexistentLogin = await fetch(`${baseUrl}/api/auth/login`, { method: 'POST', headers: { ...csrfHeaders, 'x-forwarded-for': '192.0.2.45' }, body: JSON.stringify({ email: 'nobody@example.com', password: 'incorrect password' }) });
+  assert.equal(nonexistentLogin.status, 401);
+  assert.deepEqual(await nonexistentLogin.json(), { success: false, message: 'Email or password is incorrect.' });
+  assert.equal(nonexistentLogin.headers.get('set-cookie'), null);
+  assert.equal([...users.values()].some((user) => user.email === 'nobody@example.com'), false);
+
   const missingCookie = await fetch(`${baseUrl}/api/auth/me`);
   assert.equal(missingCookie.status, 401);
   const malformedCookie = await fetch(`${baseUrl}/api/auth/me`, { headers: { cookie: 'urbanpulse_session=%E0%A4%A' } });

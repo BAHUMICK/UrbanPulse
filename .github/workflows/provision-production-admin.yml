@@ -1,0 +1,229 @@
+name: Provision UrbanPulse production admin
+
+# Safety setup (manual, before any run):
+# 1. In Render, privately inspect the deployed service's DATABASE_URL host. For
+#    db.<ref>.supabase.co use <ref>; for a Supabase pooler, use the ref in the
+#    postgres.<ref> username. Do not copy or expose the full URL.
+# 2. Independently compare that ref with the Supabase project intended for the
+#    deployed Render API, then set the repository Actions variable
+#    URBANPULSE_RENDER_SUPABASE_PROJECT_REF to that ref. The workflow compares
+#    the secret URL to this independently verified value; it cannot read
+#    Render's hidden setting itself.
+# 3. Add secrets URBANPULSE_PRODUCTION_SUPABASE_URL and
+#    URBANPULSE_ADMIN_PASSWORD. Generate/save the unique password in a password
+#    manager. It is used only in the creation step and never emitted as output.
+# 4. Run operation=check first. Only after a successful NOT_FOUND check, run a
+#    separate operation=create on the same main commit, providing that check
+#    run's ID and the exact confirmation. The artifact binds the check to email,
+#    commit, project ref, schema result, and run ID.
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Run check first; create requires a successful earlier check on this exact commit."
+        type: choice
+        required: true
+        default: check
+        options:
+          - check
+          - create
+      prior_check_run_id:
+        description: "Required for create: run ID of the successful check-only run for this commit. Leave blank for check."
+        type: string
+        required: false
+      confirm_create:
+        description: "For create, select the exact confirmation shown here."
+        type: choice
+        required: true
+        default: no
+        options:
+          - no
+          - CREATE bahumick2009@gamil.com
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: urbanpulse-production-admin-provisioning
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check create confirmation and prior run ID
+        if: inputs.operation == 'create'
+        env:
+          CONFIRM_CREATE: ${{ inputs.confirm_create }}
+          PRIOR_CHECK_RUN_ID: ${{ inputs.prior_check_run_id }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$CONFIRM_CREATE" == "CREATE bahumick2009@gamil.com" ]] || { echo "Creation stopped: exact confirmation is required."; exit 1; }
+          [[ "$PRIOR_CHECK_RUN_ID" =~ ^[0-9]+$ ]] || { echo "Creation stopped: a successful prior check run ID is required."; exit 1; }
+          (( PRIOR_CHECK_RUN_ID < CURRENT_RUN_ID )) || { echo "Creation stopped: prior check must be a separate earlier run."; exit 1; }
+
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+
+      - name: Verify Supabase target without connecting
+        env:
+          DATABASE_URL: ${{ secrets.URBANPULSE_PRODUCTION_SUPABASE_URL }}
+          RENDER_SUPABASE_PROJECT_REF: ${{ vars.URBANPULSE_RENDER_SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          try {
+            const script = require('./backend/scripts/provision-admin');
+            const db = require('./backend/src/config/db');
+            const rawUrl = process.env.DATABASE_URL;
+            const expectedRef = (process.env.RENDER_SUPABASE_PROJECT_REF || '').trim().toLowerCase();
+            if (!rawUrl) throw new Error('Production database secret is not configured.');
+            if (!/^[a-z0-9]{20}$/.test(expectedRef)) throw new Error('The independently verified Render Supabase project reference is missing or invalid.');
+            const args = script.parseArgs(['bahumick2009@gamil.com', '--check-only']);
+            const resolved = script.resolveConfig(args, process.env);
+            if (resolved.configSource !== 'DATABASE_URL environment variable') throw new Error('Provisioning did not resolve the workflow database secret.');
+            const url = new URL(rawUrl);
+            const direct = url.hostname.match(/^db\.([a-z0-9]{20})\.supabase\.co$/i);
+            const pooler = /\.pooler\.supabase\.com$/i.test(url.hostname)
+              ? decodeURIComponent(url.username).match(/^postgres\.([a-z0-9]{20})$/i) : null;
+            const actualRef = (direct?.[1] || pooler?.[1] || '').toLowerCase();
+            if (!actualRef || actualRef !== expectedRef) throw new Error('Secret URL does not match the independently verified Render Supabase project reference.');
+            const { safeDiagnostics } = db.buildPoolConfig(resolved.env);
+            if (safeDiagnostics.connectionMode !== 'DATABASE_URL' || !safeDiagnostics.sslEnabled) throw new Error('Database URL mode or verified TLS requirement failed.');
+            if (['localhost', '127.0.0.1', '::1'].includes(safeDiagnostics.targetHost)) throw new Error('Local database targets are refused.');
+            console.log(JSON.stringify({ projectRef: actualRef, host: safeDiagnostics.targetHost, port: safeDiagnostics.targetPort, database: safeDiagnostics.targetDatabase, verifiedTls: safeDiagnostics.sslEnabled }));
+          } catch {
+            console.error('Production target verification failed. No database connection was made.');
+            process.exitCode = 1;
+          }
+          NODE
+
+      - name: Validate successful prior check-only run
+        id: prior_check
+        if: inputs.operation == 'create'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          API_URL: ${{ github.api_url }}
+          PRIOR_CHECK_RUN_ID: ${{ inputs.prior_check_run_id }}
+          CURRENT_SHA: ${{ github.sha }}
+          PROJECT_REF: ${{ vars.URBANPULSE_RENDER_SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          (async () => {
+            const api = `${process.env.API_URL}/repos/${process.env.REPOSITORY}/actions/runs/${process.env.PRIOR_CHECK_RUN_ID}`;
+            const response = await fetch(api, { headers: { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: 'application/vnd.github+json' } });
+            if (!response.ok) throw new Error('Could not verify the prior run through the GitHub API.');
+            const run = await response.json();
+            const workflowPath = (run.path || '').split('@')[0];
+            if (run.event !== 'workflow_dispatch' || run.status !== 'completed' || run.conclusion !== 'success' || run.head_branch !== 'main' || run.head_sha !== process.env.CURRENT_SHA || workflowPath !== '.github/workflows/provision-production-admin.yml') {
+              throw new Error('Prior run is not a successful check run of this workflow on the same main commit.');
+            }
+          })().catch(() => {
+            console.error('Could not validate the successful prior check run.');
+            process.exitCode = 1;
+          });
+          NODE
+          mkdir -p .prior-check
+          gh run download "${PRIOR_CHECK_RUN_ID}" --repo "$REPOSITORY" --name urbanpulse-production-admin-check --dir .prior-check
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const files = fs.readdirSync('.prior-check').filter(name => name === 'check.json');
+          if (files.length !== 1) throw new Error('Prior run check artifact is missing or ambiguous.');
+          const result = JSON.parse(fs.readFileSync(path.join('.prior-check', files[0]), 'utf8'));
+          if (result.operation !== 'check' || result.runId !== Number(process.env.PRIOR_CHECK_RUN_ID) || result.headSha !== process.env.CURRENT_SHA || result.email !== 'bahumick2009@gamil.com' || result.accountStatus !== 'NOT_FOUND' || result.allRequiredTablesPresent !== true || result.projectRef !== (process.env.PROJECT_REF || '').toLowerCase()) {
+            throw new Error('Prior check did not verify the absent account, complete schema, same project, and same commit.');
+          }
+          console.log('Prior check artifact verified: account absent and every required table present.');
+          NODE
+          echo "verified=true" >> "$GITHUB_OUTPUT"
+
+      - name: Run read-only account and complete schema check
+        id: account_check
+        env:
+          DATABASE_URL: ${{ secrets.URBANPULSE_PRODUCTION_SUPABASE_URL }}
+          OPERATION: ${{ inputs.operation }}
+          CURRENT_SHA: ${{ github.sha }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+          PROJECT_REF: ${{ vars.URBANPULSE_RENDER_SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const { provisionAdmin, REQUIRED_TABLES } = require('./backend/scripts/provision-admin');
+          const quietLogger = { log() {}, warn() {}, error() {} };
+          (async () => {
+            const result = await provisionAdmin({ argv: ['bahumick2009@gamil.com', '--check-only'], logger: quietLogger, exitOnError: false });
+            const present = result.schemaCheck && REQUIRED_TABLES.every(table => result.schemaCheck.tableStatus?.[table] === true);
+            if (!present || result.schemaCheck.allTablesPresent !== true || Object.keys(result.schemaCheck.tableStatus || {}).length !== REQUIRED_TABLES.length) {
+              throw new Error('Required schema is missing or inconclusive; creation is blocked.');
+            }
+            const output = { operation: process.env.OPERATION, runId: Number(process.env.CURRENT_RUN_ID), headSha: process.env.CURRENT_SHA, email: 'bahumick2009@gamil.com', accountStatus: result.status, role: result.user?.role || null, allRequiredTablesPresent: true, requiredTables: result.schemaCheck.tableStatus, targetHost: result.safeDiagnostics.targetHost, targetDatabase: result.safeDiagnostics.targetDatabase, projectRef: (process.env.PROJECT_REF || '').toLowerCase() };
+            console.log(JSON.stringify(output));
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `status=${result.status}\nall_tables=true\n`);
+            if (process.env.OPERATION === 'create' && result.status !== 'NOT_FOUND') throw new Error('Creation stopped: account is not absent; no existing account will be modified.');
+            if (process.env.OPERATION === 'check' && result.status !== 'NOT_FOUND') throw new Error('Check did not confirm account absence; no creation artifact will be produced.');
+            if (process.env.OPERATION === 'check') fs.writeFileSync('check.json', JSON.stringify(output));
+          })().catch(() => { console.error('Read-only account/schema check failed or was inconclusive.'); process.exitCode = 1; });
+          NODE
+
+      - name: Save successful check-only evidence
+        if: inputs.operation == 'check' && steps.account_check.outputs.status == 'NOT_FOUND' && steps.account_check.outputs.all_tables == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: urbanpulse-production-admin-check
+          path: check.json
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Create the missing admin with the existing provisioning script
+        if: inputs.operation == 'create' && steps.prior_check.outputs.verified == 'true' && steps.account_check.outputs.status == 'NOT_FOUND' && steps.account_check.outputs.all_tables == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.URBANPULSE_PRODUCTION_SUPABASE_URL }}
+          ADMIN_PASSWORD: ${{ secrets.URBANPULSE_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { provisionAdmin } = require('./backend/scripts/provision-admin');
+          const quietLogger = { log() {}, warn() {}, error() {} };
+          (async () => {
+            const result = await provisionAdmin({ argv: ['bahumick2009@gamil.com'], logger: quietLogger, exitOnError: false });
+            if (result.status !== 'PROVISIONED' || result.user?.email !== 'bahumick2009@gamil.com' || result.user?.role !== 'admin') throw new Error('Expected new admin was not provisioned.');
+            console.log(JSON.stringify({ account: 'bahumick2009@gamil.com', status: result.status, role: 'admin' }));
+          })().catch(() => { console.error('Admin provisioning failed. No credentials were logged.'); process.exitCode = 1; });
+          NODE
+
+      - name: Verify the new admin role
+        if: inputs.operation == 'create' && steps.prior_check.outputs.verified == 'true' && steps.account_check.outputs.status == 'NOT_FOUND'
+        env:
+          DATABASE_URL: ${{ secrets.URBANPULSE_PRODUCTION_SUPABASE_URL }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { provisionAdmin } = require('./backend/scripts/provision-admin');
+          const quietLogger = { log() {}, warn() {}, error() {} };
+          (async () => {
+            const result = await provisionAdmin({ argv: ['bahumick2009@gamil.com', '--check-only'], logger: quietLogger, exitOnError: false });
+            if (result.status !== 'EXISTS' || result.user?.role !== 'admin') throw new Error('Read-only verification did not confirm the admin role.');
+            console.log(JSON.stringify({ account: 'bahumick2009@gamil.com', status: result.status, role: 'admin' }));
+          })().catch(() => { console.error('Admin role verification failed. Do not assume provisioning succeeded.'); process.exitCode = 1; });
+          NODE

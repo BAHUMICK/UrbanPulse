@@ -210,6 +210,35 @@ test('provisionAdmin stops with clear diagnostic guidance when app_users is miss
   assert.match(errorOutput, /--database-url/);
 });
 
+test('provisionAdmin fails closed when any declared required table is missing', async () => {
+  const missingTable = 'auth_sessions';
+  let accountLookupPerformed = false;
+  let accountWritePerformed = false;
+  const mockPool = {
+    query: async (sql) => {
+      if (sql.includes('information_schema.tables')) {
+        return { rows: REQUIRED_TABLES.filter((table) => table !== missingTable).map((table_name) => ({ table_name })) };
+      }
+      if (sql.includes('FROM app_users WHERE LOWER(email) = $1')) accountLookupPerformed = true;
+      if (/INSERT|UPDATE|DELETE/i.test(sql)) accountWritePerformed = true;
+      return { rows: [] };
+    },
+    end: async () => {},
+  };
+
+  await assert.rejects(
+    () => provisionAdmin({
+      argv: ['new-admin@example.test', '--password=one-time-admin-password'],
+      injectedPool: mockPool,
+      logger: { log() {}, warn() {}, error() {} },
+      exitOnError: false,
+    }),
+    /Missing required tables: auth_sessions/
+  );
+  assert.equal(accountLookupPerformed, false);
+  assert.equal(accountWritePerformed, false);
+});
+
 test('provisionAdmin --check-only accurately reports user presence without modifying data', async () => {
   const logged = [];
   const mockLogger = {
@@ -261,6 +290,58 @@ test('provisionAdmin --check-only accurately reports user presence without modif
   assert.equal(res2.status, 'NOT_FOUND');
   assert.equal(res2.user, null);
   assert.equal(writeOperationPerformed, false);
+});
+
+test('provisionAdmin creates a missing admin and repeat execution does not change it', async () => {
+  const password = 'one-time-admin-password-for-test';
+  const users = new Map();
+  const writes = [];
+  const logs = [];
+  const mockPool = {
+    query: async (sql, params = []) => {
+      if (sql.includes('information_schema.tables')) {
+        return { rows: REQUIRED_TABLES.map((table_name) => ({ table_name })) };
+      }
+      if (sql.includes('FROM app_users WHERE LOWER(email) = $1')) {
+        const user = users.get(params[0]);
+        return { rows: user ? [{ ...user }] : [] };
+      }
+      if (sql.startsWith('INSERT INTO app_users')) {
+        writes.push(sql);
+        const [email, password_hash, role] = params;
+        const user = { id: 1, email, password_hash, role, created_at: new Date() };
+        users.set(email, user);
+        return { rows: [{ id: user.id, email, role, created_at: user.created_at }] };
+      }
+      throw new Error(`Unexpected query in provisioning test: ${sql}`);
+    },
+    end: async () => {},
+  };
+  const options = {
+    argv: ['new-admin@example.test'],
+    baseEnv: {
+      DATABASE_URL: 'postgresql://test:test@db.example.invalid:5432/testdb',
+      ADMIN_PASSWORD: password,
+    },
+    injectedPool: mockPool,
+    logger: { log: (...args) => logs.push(args.join(' ')), warn() {}, error() {} },
+    exitOnError: false,
+  };
+
+  const created = await provisionAdmin(options);
+  assert.equal(created.status, 'PROVISIONED');
+  assert.equal(created.user.email, 'new-admin@example.test');
+  assert.equal(created.user.role, 'admin');
+  const storedUser = users.get('new-admin@example.test');
+  assert.match(storedUser.password_hash, /^scrypt\$16384\$8\$1\$/);
+  assert.equal(await verifyPassword(password, storedUser.password_hash), true);
+
+  const repeated = await provisionAdmin(options);
+  assert.equal(repeated.status, 'EXISTS_ADMIN');
+  assert.equal(writes.length, 1);
+  assert.equal(users.get('new-admin@example.test').password_hash, storedUser.password_hash);
+  assert.equal(logs.join('\n').includes(password), false);
+  assert.equal(logs.join('\n').includes(storedUser.password_hash), false);
 });
 
 test('provisionAdmin guards against accidental role change without --confirm-role-change', async () => {
