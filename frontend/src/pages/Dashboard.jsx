@@ -8,14 +8,12 @@ import {
 } from '../services/api';
 import { SeverityBadge, StatusBadge, ImpactBadge, SectorBadge } from '../components/Badges';
 import { getDashboardMetrics } from './dashboardMetrics';
+import './adminDashboard.css';
 import {
   IconAlertTriangle,
-  IconShield,
   IconActivity,
   IconCheckCircle,
-  IconClock,
   IconMapPin,
-  IconAlerts,
   IconRefresh,
 } from '../components/Icons';
 
@@ -47,7 +45,7 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
       setActiveAlerts(alertsData);
     } catch (err) {
       console.error('Error loading dashboard intelligence:', err);
-      setError(err.message || 'Failed to load telemetry data');
+      setError(err.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -74,14 +72,14 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
   }
 
   // Calculated metrics
-  const { total, critical, high, reported, inProgress, resolved, activeCount, resolutionRate, highPriorityTotal } = getDashboardMetrics(issues);
+  const { total, critical, reported, inProgress, resolved, activeCount, resolutionRate, highPriorityTotal } = getDashboardMetrics(issues);
 
   const topPriorityList = useMemo(() => {
     return priorityIssues.filter((issue) => issue.status !== 'Resolved').slice(0, 5);
   }, [priorityIssues]);
 
   const recentIssues = useMemo(() => {
-    return issues.slice(0, 5);
+    return [...issues].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)).slice(0, 5);
   }, [issues]);
 
   const topImpact = useMemo(() => {
@@ -105,10 +103,10 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
       <div className="intel-card" style={{ padding: '40px 20px', textAlign: 'center' }}>
         <IconRefresh size={28} className="spin-anim" style={{ color: 'var(--accent-cyan)', marginBottom: 12 }} />
         <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-          Ingesting Urban Infrastructure Telemetry...
+          Loading dashboard…
         </div>
         <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: 4 }}>
-          Querying PostgreSQL & scoring civic anomalies
+          Loading reports, priorities, and alerts
         </div>
       </div>
     );
@@ -119,7 +117,7 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
       <div className="feedback-banner feedback-error">
         <IconAlertTriangle size={18} />
         <div>
-          <strong>Telemetry Synchronization Error:</strong> {error}
+          <strong>Could not load dashboard:</strong> {error}
           <button
             type="button"
             className="btn-ack"
@@ -134,78 +132,23 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
   }
 
   return (
-    <div className="dashboard-page">
-      {/* 1. TOP 5-METRIC KPI STRIP */}
-      <section className="kpi-grid">
-        {/* TOTAL ISSUES */}
-        <div className="kpi-card kpi-total">
-          <div className="kpi-card-top">
-            <span className="kpi-card-label">Total Ingested</span>
-            <div className="kpi-icon-wrap">
-              <IconActivity size={15} />
+    <div className="dashboard-page admin-dashboard">
+      <section className="kpi-grid" aria-label="Issue overview">
+        {[
+          { label: 'Total Issues', value: total, style: 'kpi-total', icon: <IconActivity size={17} />, note: 'All submitted reports' },
+          { label: 'Pending Issues', value: activeCount, style: 'kpi-high', icon: <IconRefresh size={17} />, note: `${reported} reported · ${inProgress} in progress` },
+          { label: 'Critical Issues', value: critical, style: 'kpi-critical', icon: <IconAlertTriangle size={17} />, note: 'Unresolved critical reports' },
+          { label: 'Resolved Issues', value: resolved, style: 'kpi-resolved', icon: <IconCheckCircle size={17} />, note: `${resolutionRate}% of all reports resolved` },
+        ].map((metric) => (
+          <div className={`kpi-card ${metric.style}`} key={metric.label}>
+            <div className="kpi-card-top">
+              <span className="kpi-card-label">{metric.label}</span>
+              <div className="kpi-icon-wrap">{metric.icon}</div>
             </div>
+            <div className="kpi-val">{metric.value}</div>
+            <div className="kpi-sub">{metric.note}</div>
           </div>
-          <div className="kpi-val">{total}</div>
-          <div className="kpi-sub">
-            <span>{activeCount} Active</span> • <span>{resolved} Resolved</span>
-          </div>
-        </div>
-
-        {/* CRITICAL SEVERITY */}
-        <div className="kpi-card kpi-critical">
-          <div className="kpi-card-top">
-            <span className="kpi-card-label">Critical Anomalies</span>
-            <div className="kpi-icon-wrap">
-              <IconAlertTriangle size={15} />
-            </div>
-          </div>
-          <div className="kpi-val">{critical}</div>
-          <div className="kpi-sub">
-            <span style={{ color: '#fca5a5' }}>Immediate Threat</span>
-          </div>
-        </div>
-
-        {/* HIGH PRIORITY */}
-        <div className="kpi-card kpi-high">
-          <div className="kpi-card-top">
-            <span className="kpi-card-label">High Priority</span>
-            <div className="kpi-icon-wrap">
-              <IconShield size={15} />
-            </div>
-          </div>
-          <div className="kpi-val">{highPriorityTotal}</div>
-          <div className="kpi-sub">
-            <span>{critical} Crit</span> • <span>{high} High</span>
-          </div>
-        </div>
-
-        {/* ACTIVE MUNICIPAL ALERTS */}
-        <div className="kpi-card kpi-alerts">
-          <div className="kpi-card-top">
-            <span className="kpi-card-label">Active Alerts</span>
-            <div className="kpi-icon-wrap">
-              <IconAlerts size={15} />
-            </div>
-          </div>
-          <div className="kpi-val">{activeAlerts.length}</div>
-          <div className="kpi-sub">
-            <span style={{ color: '#fda4af' }}>Awaiting Municipal Action</span>
-          </div>
-        </div>
-
-        {/* RESOLUTION PROGRESS */}
-        <div className="kpi-card kpi-resolved">
-          <div className="kpi-card-top">
-            <span className="kpi-card-label">Resolution Rate</span>
-            <div className="kpi-icon-wrap">
-              <IconCheckCircle size={15} />
-            </div>
-          </div>
-          <div className="kpi-val">{resolutionRate}%</div>
-          <div className="kpi-sub">
-            <span>{resolved} of {total} Closed</span>
-          </div>
-        </div>
+        ))}
       </section>
 
       {/* 2. MAIN TWO-COLUMN SPLIT INTELLIGENCE GRID */}
@@ -213,14 +156,14 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
         {/* LEFT COLUMN: PRIORITY INTELLIGENCE & RECENT ACTIVITY */}
         <div className="dashboard-col-left">
           {/* PRIORITY INTELLIGENCE LEADERBOARD */}
-          <div className="intel-card">
+          <div className="intel-card admin-attention">
             <div className="intel-card-header">
               <div className="intel-header-left">
-                <span className="intel-header-badge">RULE-BASED ENGINE</span>
+                <span className="intel-header-badge">{highPriorityTotal} high / critical</span>
                 <div>
-                  <div className="intel-header-title">Priority Intelligence Leaderboard</div>
+                  <div className="intel-header-title">Issues Requiring Attention</div>
                   <div className="intel-header-sub">
-                    Multi-factor ranking (Severity + Category + Status + Cluster Density)
+                    Unresolved reports, ranked by the existing priority score
                   </div>
                 </div>
               </div>
@@ -230,14 +173,14 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
                 style={{ fontSize: 11, padding: '4px 9px' }}
                 onClick={() => onNavigate && onNavigate('issues')}
               >
-                All Incidents →
+                View All Issues →
               </button>
             </div>
 
             <div className="intel-card-body">
               {topPriorityList.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '16px', color: 'var(--text-muted)' }}>
-                  No priority anomaly data available.
+                  No unresolved priority reports to show.
                 </div>
               ) : (
                 <div className="priority-leader-list">
@@ -254,12 +197,12 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
                           <span style={{ color: 'var(--text-muted)' }}>• {issue.category}</span>
                         </div>
                         {issue.scoreBreakdown && (
-                          <div className="priority-breakdown-tags" style={{ marginTop: 5 }}>
-                            <span className="factor-tag">Sev: {issue.scoreBreakdown.severity}</span>
-                            <span className="factor-tag">Stat: {issue.scoreBreakdown.status}</span>
-                            <span className="factor-tag">Cat: {issue.scoreBreakdown.category}</span>
-                            <span className="factor-tag">Dens: {issue.scoreBreakdown.locationDensity}</span>
-                          </div>
+                          <details className="admin-score-details"><summary>Score details</summary><div className="priority-breakdown-tags" style={{ marginTop: 5 }}>
+                            <span className="factor-tag">Severity: {issue.scoreBreakdown.severity}</span>
+                            <span className="factor-tag">Status: {issue.scoreBreakdown.status}</span>
+                            <span className="factor-tag">Category: {issue.scoreBreakdown.category}</span>
+                            <span className="factor-tag">Density: {issue.scoreBreakdown.locationDensity}</span>
+                          </div></details>
                         )}
                       </div>
 
@@ -275,13 +218,13 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
           </div>
 
           {/* RECENT INFRASTRUCTURE ACTIVITY */}
-          <div className="intel-card">
+          <div className="intel-card admin-recent">
             <div className="intel-card-header">
               <div className="intel-header-left">
-                <span className="intel-header-badge">LIVE INGESTION</span>
+                <span className="intel-header-badge">Latest 5</span>
                 <div>
-                  <div className="intel-header-title">Recent Infrastructure Activity</div>
-                  <div className="intel-header-sub">Latest telemetry and reports filed into UrbanPulse</div>
+                  <div className="intel-header-title">Recent Reports</div>
+                  <div className="intel-header-sub">The most recently submitted reports</div>
                 </div>
               </div>
               <button
@@ -290,7 +233,7 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
                 style={{ fontSize: 11, padding: '4px 9px' }}
                 onClick={() => onNavigate && onNavigate('report')}
               >
-                + Report New
+                + Report Issue
               </button>
             </div>
 
@@ -309,7 +252,7 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
                           <SectorBadge sector={issue.sector} size="small" />
                           <span>{issue.category}</span> •{' '}
                           <span>
-                            {issue.latitude && issue.longitude
+                            {issue.latitude != null && issue.longitude != null
                               ? `${Number(issue.latitude).toFixed(3)}, ${Number(issue.longitude).toFixed(3)}`
                               : 'Location set'}
                           </span>
@@ -329,7 +272,7 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
         {/* RIGHT COLUMN: ACTIVE MUNICIPAL ALERTS & IMPACT SPECTRUM */}
         <div className="dashboard-col-right">
           {/* ACTIVE ALERTS FEED */}
-          <div className="intel-card">
+          <div className="intel-card admin-alerts">
             <div className="intel-card-header">
               <div className="intel-header-left">
                 <span
@@ -340,11 +283,11 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
                     borderColor: 'rgba(244, 63, 94, 0.25)',
                   }}
                 >
-                  IN-APP ALERTS
+                  {activeAlerts.length} active
                 </span>
                 <div>
-                  <div className="intel-header-title">Active Municipal Alerts</div>
-                  <div className="intel-header-sub">Automated triggers requiring authority intervention</div>
+                  <div className="intel-header-title">Active Alerts</div>
+                  <div className="intel-header-sub">Alerts awaiting acknowledgement or resolution</div>
                 </div>
               </div>
               <button
@@ -353,7 +296,7 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
                 style={{ fontSize: 11, padding: '4px 9px' }}
                 onClick={() => onNavigate && onNavigate('alerts')}
               >
-                All Alerts →
+                View All Alerts →
               </button>
             </div>
 
@@ -362,10 +305,10 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
                 <div style={{ textAlign: 'center', padding: '24px 12px', color: 'var(--text-muted)' }}>
                   <IconCheckCircle size={24} style={{ color: '#34d399', marginBottom: 6 }} />
                   <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600 }}>
-                    Zero Active Alerts
+                    No active alerts
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    All triggered municipal alerts have been acknowledged or resolved.
+                    No alerts currently require action.
                   </div>
                 </div>
               ) : (
@@ -417,13 +360,13 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
           </div>
 
           {/* CIVIC SECTOR OVERVIEW CARD */}
-          <div className="intel-card">
+          <div className="intel-card admin-sectors">
             <div className="intel-card-header">
               <div className="intel-header-left">
                 <span className="intel-header-badge">CIVIC SECTORS</span>
                 <div>
-                  <div className="intel-header-title">Municipal Sector Distribution</div>
-                  <div className="intel-header-sub">Active infrastructure load across civic wings</div>
+                  <div className="intel-header-title">Issues by Civic Sector</div>
+                  <div className="intel-header-sub">All reports across the five most-reported sectors</div>
                 </div>
               </div>
             </div>
@@ -457,14 +400,14 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
           </div>
 
           {/* HIGHEST IMPACT ANOMALY CARD */}
-          {topImpact && (
-            <div className="intel-card">
+          {topImpact ? (
+            <div className="intel-card admin-impact">
               <div className="intel-card-header">
                 <div className="intel-header-left">
                   <span className="intel-header-badge">MAX IMPACT</span>
                   <div>
-                    <div className="intel-header-title">Primary Urban Bottleneck</div>
-                    <div className="intel-header-sub">Calculated highest civic disruption signal</div>
+                    <div className="intel-header-title">Highest-Impact Issue</div>
+                    <div className="intel-header-sub">Based on the existing impact ranking</div>
                   </div>
                 </div>
               </div>
@@ -503,17 +446,25 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
 
                 {topImpact.impactFactors && (
                   <div style={{ marginTop: 10, fontSize: '11px', color: 'var(--text-muted)' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Key Risk Factors: </span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Impact factors: </span>
                     {topImpact.impactFactors.join(', ')}
                   </div>
                 )}
               </div>
             </div>
+          ) : (
+            <div className="intel-card admin-impact">
+              <div className="intel-card-header"><div className="intel-header-title">Highest-Impact Issue</div></div>
+              <div className="intel-card-body admin-empty">No impact results available yet.</div>
+            </div>
           )}
 
           {/* QUICK GIS MAP SHORTCUT CARD */}
           <div
-            className="intel-card"
+            className="intel-card admin-map-shortcut"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onNavigate?.('map'); } }}
             style={{
               cursor: 'pointer',
               background: 'linear-gradient(135deg, #0d1829 0%, #09111c 100%)',
@@ -539,10 +490,10 @@ function Dashboard({ onNavigate, onTelemetryUpdate, isAdmin = false }) {
               </div>
               <div>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: '#f1f5f9' }}>
-                  Interactive Geospatial Map
+                  Explore the Map
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  View all {total} reported infrastructure coordinates plotted on OpenStreetMap
+                  View report locations on OpenStreetMap
                 </div>
               </div>
             </div>

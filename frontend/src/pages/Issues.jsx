@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import './adminIssues.css';
 import {
   getIssues,
   getPriorityIssues,
@@ -221,7 +222,7 @@ function Issues({ onNavigate, isAdmin = false }) {
   }, [filteredIssues, page]);
 
   return (
-    <div className="issues-page">
+    <div className={isAdmin ? 'issues-page admin-issues' : 'issues-page'}>
       {/* UPDATE NOTIFICATION */}
       {updateMsg && (
         <div className="feedback-banner feedback-success" style={{ marginBottom: 12 }}>
@@ -342,7 +343,7 @@ function Issues({ onNavigate, isAdmin = false }) {
             style={{ color: '#38bdf8' }}
             onClick={() => onNavigate && onNavigate('report')}
           >
-            {isAdmin ? '+ Ingest Issue' : '+ Report issue'}
+            {isAdmin ? '+ Report Issue' : '+ Report issue'}
           </button>
         </div>
       </div>
@@ -354,12 +355,12 @@ function Issues({ onNavigate, isAdmin = false }) {
             <thead>
               <tr>
                 <th style={{ width: '45px' }}>ID</th>
-                <th>Infrastructure Anomaly</th>
-                <th>Civic Sector</th>
-                <th>Category</th>
+                <th>{isAdmin ? 'Issue / Location' : 'Infrastructure Anomaly'}</th>
+                <th>{isAdmin ? 'Civic Sector / Category' : 'Civic Sector'}</th>
+                {!isAdmin && <th>Category</th>}
                 <th>Severity</th>
                 {isAdmin && <th>Priority</th>}
-                <th>Evidence / Proof</th>
+                <th>{isAdmin ? 'Evidence' : 'Evidence / Proof'}</th>
                 <th>Status</th>
                 <th style={{ textAlign: 'center', width: '80px' }}>Action</th>
               </tr>
@@ -367,14 +368,14 @@ function Issues({ onNavigate, isAdmin = false }) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={isAdmin ? 9 : 8} role="status" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                    Loading incident repository...
+                  <td colSpan={8} role="status" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                    {isAdmin ? 'Loading reports…' : 'Loading incident repository...'}
                   </td>
                 </tr>
               ) : paginatedIssues.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 9 : 8} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                    {issues.length === 0 ? 'You have not submitted any reports yet.' : 'No reports matched your active filters.'}
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                    {issues.length === 0 ? (isAdmin ? 'No reports have been submitted yet.' : 'You have not submitted any reports yet.') : 'No reports matched your active filters.'}
                   </td>
                 </tr>
               ) : (
@@ -398,17 +399,23 @@ function Issues({ onNavigate, isAdmin = false }) {
                           {issue.title}
                         </div>
                         <div className="td-desc-sub">{issue.description}</div>
+                        {isAdmin && <div className="admin-issue-location"><IconMapPin size={12} />
+                          {issue.latitude != null && issue.longitude != null
+                            ? `${Number(issue.latitude).toFixed(4)}, ${Number(issue.longitude).toFixed(4)}`
+                            : 'Location unavailable'}
+                        </div>}
                       </td>
 
                       <td>
                         <SectorBadge sector={issue.sector} size="small" />
+                        {isAdmin && <div className="admin-issue-category">{issue.category}</div>}
                       </td>
 
-                      <td>
+                      {!isAdmin && <td>
                         <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '11.5px' }}>
                           {issue.category}
                         </span>
-                      </td>
+                      </td>}
 
                       <td>
                         <SeverityBadge severity={issue.severity} size="small" />
@@ -458,7 +465,7 @@ function Issues({ onNavigate, isAdmin = false }) {
                           title="Inspect incident and evidence proof"
                         >
                           <IconEye size={13} style={{ marginRight: 3, verticalAlign: -1 }} />
-                          Inspect
+                          {isAdmin ? 'Details' : 'Inspect'}
                         </button>
                       </td>
                     </tr>

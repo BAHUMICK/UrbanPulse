@@ -1,0 +1,30 @@
+/* Applied only when Issues receives isAdmin=true. */
+.admin-issues { min-width: 0; }
+.admin-issues .table-filter-bar { align-items: start; gap: 12px; flex-wrap: wrap; }
+.admin-issues .filter-group-left { flex-wrap: wrap; min-width: 0; gap: 10px; }
+.admin-issues .filter-selects-wrap { gap: 8px; }
+.admin-issues .incident-table { min-width: 850px; }
+.admin-issues .incident-table th { font-size: 11px; text-transform: none; letter-spacing: 0; padding: 13px 12px; }
+.admin-issues .incident-table td { padding: 14px 12px; vertical-align: top; }
+.admin-issues .incident-table th:nth-child(2) { width: 30%; }
+.admin-issues .td-title-bold { white-space: normal; overflow-wrap: anywhere; line-height: 1.5; max-width: 360px; }
+.admin-issues .td-desc-sub { max-width: 360px; margin-top: 4px; }
+.admin-issues .admin-issue-location { display: flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 11px; color: var(--text-muted); }
+.admin-issues .admin-issue-category { margin-top: 7px; font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+.admin-issues .status-dropdown { min-width: 112px; }
+.admin-issues .table-responsive { max-width: 100%; overflow-x: auto; }
+@media (max-width: 700px) {
+  .admin-issues .filter-selects-wrap { width: 100%; }
+  .admin-issues .filter-select { max-width: 100%; }
+}
+@media (max-width: 640px) {
+  .admin-issues .incident-table { min-width: 0; }
+  .admin-issues .incident-table td { padding: 7px 5px; }
+  .admin-issues .incident-table td:nth-child(3)::before { content: 'Sector / Category'; }
+  .admin-issues .incident-table td:nth-child(4)::before { content: 'Severity'; }
+  .admin-issues .incident-table td:nth-child(5)::before { content: 'Priority'; }
+  .admin-issues .incident-table td:nth-child(6)::before { content: 'Evidence'; }
+  .admin-issues .incident-table td:nth-child(7)::before { content: 'Status'; }
+  .admin-issues .incident-table td:nth-child(8) { grid-column: 1 / -1; }
+  .admin-issues .incident-table td:nth-child(8)::before { content: 'Actions'; }
+}

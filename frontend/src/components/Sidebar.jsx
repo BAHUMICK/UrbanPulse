@@ -76,12 +76,12 @@ function Sidebar({
         </div>
         <div className="brand-text">
           <span className="brand-title">UrbanPulse</span>
-          <span className="brand-tagline">Civic Anomaly Intelligence</span>
+          <span className="brand-tagline">{user?.role === 'admin' ? 'City Infrastructure' : 'Civic Anomaly Intelligence'}</span>
         </div>
       </div>
 
       {/* COMMAND SECTOR LABEL */}
-      <div className="sidebar-section-title">{user?.role === 'admin' ? 'COMMAND NAVIGATION' : 'YOUR REPORTS'}</div>
+      <div className="sidebar-section-title">{user?.role === 'admin' ? 'ADMINISTRATION' : 'YOUR REPORTS'}</div>
 
       {/* NAVIGATION ITEMS */}
       <nav className="sidebar-nav">

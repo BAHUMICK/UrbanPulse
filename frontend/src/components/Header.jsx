@@ -64,13 +64,22 @@ function Header({
     return () => clearInterval(interval);
   }, []);
 
+  const adminMeta = user?.role === 'admin' ? {
+    dashboard: { title: 'Admin Dashboard', subtitle: 'Review reports, manage priorities, and respond to alerts', sector: 'ADMINISTRATION' },
+    issues: { title: 'Issues', subtitle: 'Find reports, review evidence, and update their status', sector: 'REPORT MANAGEMENT' },
+    report: { title: 'Report Issue', subtitle: 'Submit a civic infrastructure concern', sector: 'NEW REPORT' },
+    map: { title: 'Map', subtitle: 'Explore reported issues by location', sector: 'ISSUE LOCATIONS' },
+    alerts: { title: 'Alerts', subtitle: 'Review and manage municipal alerts', sector: 'ALERT MANAGEMENT' },
+    analytics: { title: 'Analytics', subtitle: 'Review issue trends, severity, and impact', sector: 'CITY OVERVIEW' },
+  }[currentPage] : null;
+
   const meta = user?.role === 'citizen' && currentPage === 'dashboard'
     ? { title: 'Your reports and neighborhood', subtitle: 'Track the civic issues you have reported', sector: 'CITIZEN PORTAL' }
     : user?.role === 'citizen' && currentPage === 'issues'
       ? { title: 'My reports', subtitle: 'Review the reports submitted from your account', sector: 'CITIZEN PORTAL' }
     : user?.role === 'citizen' && currentPage === 'report'
       ? { title: 'Report a civic issue', subtitle: 'Share a local infrastructure concern', sector: 'CITIZEN PORTAL' }
-      : PAGE_META[currentPage] || PAGE_META.dashboard;
+      : adminMeta || PAGE_META[currentPage] || PAGE_META.dashboard;
 
   return (
     <header className="app-header">
