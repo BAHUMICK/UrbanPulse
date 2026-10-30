@@ -85,6 +85,7 @@ jobs:
       - name: Verify Supabase target without connecting
         env:
           DATABASE_URL: ${{ secrets.URBANPULSE_PRODUCTION_SUPABASE_URL }}
+          DB_SSL_CA: ${{ secrets.URBANPULSE_SUPABASE_CA_CERT }}
           RENDER_SUPABASE_PROJECT_REF: ${{ vars.URBANPULSE_RENDER_SUPABASE_PROJECT_REF }}
         run: |
           set -euo pipefail
@@ -161,6 +162,7 @@ jobs:
         id: account_check
         env:
           DATABASE_URL: ${{ secrets.URBANPULSE_PRODUCTION_SUPABASE_URL }}
+          DB_SSL_CA: ${{ secrets.URBANPULSE_SUPABASE_CA_CERT }}
           OPERATION: ${{ inputs.operation }}
           CURRENT_SHA: ${{ github.sha }}
           CURRENT_RUN_ID: ${{ github.run_id }}
@@ -241,6 +243,7 @@ jobs:
         if: inputs.operation == 'create' && steps.prior_check.outputs.verified == 'true' && steps.account_check.outputs.status == 'NOT_FOUND' && steps.account_check.outputs.all_tables == 'true'
         env:
           DATABASE_URL: ${{ secrets.URBANPULSE_PRODUCTION_SUPABASE_URL }}
+          DB_SSL_CA: ${{ secrets.URBANPULSE_SUPABASE_CA_CERT }}
           ADMIN_PASSWORD: ${{ secrets.URBANPULSE_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
@@ -258,6 +261,7 @@ jobs:
         if: inputs.operation == 'create' && steps.prior_check.outputs.verified == 'true' && steps.account_check.outputs.status == 'NOT_FOUND'
         env:
           DATABASE_URL: ${{ secrets.URBANPULSE_PRODUCTION_SUPABASE_URL }}
+          DB_SSL_CA: ${{ secrets.URBANPULSE_SUPABASE_CA_CERT }}
         run: |
           set -euo pipefail
           node <<'NODE'
