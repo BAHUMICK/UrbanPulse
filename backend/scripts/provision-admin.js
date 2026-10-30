@@ -35,14 +35,21 @@ const REQUIRED_TABLES = [
   'user_notifications',
   'issue_subscriptions',
 ];
+const TLS_ERROR_CODES = new Set([
+  'SELF_SIGNED_CERT_IN_CHAIN', 'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'UNABLE_TO_GET_ISSUER_CERT',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY', 'CERT_HAS_EXPIRED',
+  'CERT_NOT_YET_VALID', 'ERR_TLS_CERT_ALTNAME_INVALID',
+]);
 const CONNECTION_ERROR_CODES = new Set([
   'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNRESET', 'EHOSTUNREACH',
   'EPIPE', 'EAI_AGAIN', '57P03', '28P01', '3D000',
+  ...TLS_ERROR_CODES,
 ]);
 
 function safeErrorCode(error) {
   const code = error?.code;
-  return typeof code === 'string' && (/^[A-Z0-9]{5}$/.test(code) || /^E[A-Z0-9_]{1,32}$/.test(code))
+  return typeof code === 'string' && (TLS_ERROR_CODES.has(code) || /^[A-Z0-9]{5}$/.test(code) || /^E[A-Z0-9_]{1,32}$/.test(code))
     ? code
     : null;
 }

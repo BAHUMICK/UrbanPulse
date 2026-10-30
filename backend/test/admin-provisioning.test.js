@@ -272,6 +272,40 @@ test('provisionAdmin surfaces a safe database-connection diagnostic without raw 
   assert.equal(logged.join('\n').includes(privateDriverMessage), false);
 });
 
+test('TLS failures preserve safe codes and stop the read-only check without account queries', async () => {
+  const codes = [
+    'SELF_SIGNED_CERT_IN_CHAIN', 'DEPTH_ZERO_SELF_SIGNED_CERT',
+    'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'UNABLE_TO_GET_ISSUER_CERT',
+    'UNABLE_TO_GET_ISSUER_CERT_LOCALLY', 'CERT_HAS_EXPIRED',
+    'CERT_NOT_YET_VALID', 'ERR_TLS_CERT_ALTNAME_INVALID',
+  ];
+  for (const code of codes) {
+    const logged = [];
+    let queries = 0;
+    const privateMessage = 'private driver details that must never be logged';
+    const failure = await provisionAdmin({
+      argv: ['new-admin@example.test', '--check-only'],
+      baseEnv: { DATABASE_URL: 'postgresql://test:test@db.example.invalid:5432/testdb' },
+      injectedPool: {
+        query: async (sql) => {
+          queries++;
+          assert.match(sql, /information_schema\.tables/);
+          throw Object.assign(new Error(privateMessage), { code });
+        },
+      },
+      logger: { log: (...args) => logged.push(args.join(' ')), warn() {}, error: (...args) => logged.push(args.join(' ')) },
+      exitOnError: false,
+    }).then(() => assert.fail('TLS failure must stop the check.'), (error) => error);
+    assert.equal(queries, 1);
+    assert.deepEqual(getSafeCheckDiagnostic(failure), {
+      category: 'database_connection', code, stage: 'schema_inspection',
+    });
+    assert.equal(failure.message.includes(privateMessage), false);
+    assert.equal(logged.join('\n').includes(privateMessage), false);
+  }
+  assert.deepEqual(getSafeCheckDiagnostic({ code: 'PRIVATE_UNRECOGNIZED_TLS_DETAIL' }), { category: 'unexpected' });
+});
+
 test('provisionAdmin identifies schema-inspection failures without exposing raw errors', async () => {
   const privateDriverMessage = 'permission failure with private connection details';
   const mockPool = {
