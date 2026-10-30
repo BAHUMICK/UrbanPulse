@@ -39,7 +39,7 @@ on:
         default: no
         options:
           - no
-          - CREATE bahumick2009@gamil.com
+          - CREATE bahumick2009@gmail.com
 
 permissions:
   contents: read
@@ -63,7 +63,7 @@ jobs:
           CURRENT_RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
-          [[ "$CONFIRM_CREATE" == "CREATE bahumick2009@gamil.com" ]] || { echo "Creation stopped: exact confirmation is required."; exit 1; }
+          [[ "$CONFIRM_CREATE" == "CREATE bahumick2009@gmail.com" ]] || { echo "Creation stopped: exact confirmation is required."; exit 1; }
           [[ "$PRIOR_CHECK_RUN_ID" =~ ^[0-9]+$ ]] || { echo "Creation stopped: a successful prior check run ID is required."; exit 1; }
           (( PRIOR_CHECK_RUN_ID < CURRENT_RUN_ID )) || { echo "Creation stopped: prior check must be a separate earlier run."; exit 1; }
 
@@ -96,7 +96,7 @@ jobs:
             const expectedRef = (process.env.RENDER_SUPABASE_PROJECT_REF || '').trim().toLowerCase();
             if (!rawUrl) throw new Error('Production database secret is not configured.');
             if (!/^[a-z0-9]{20}$/.test(expectedRef)) throw new Error('The independently verified Render Supabase project reference is missing or invalid.');
-            const args = script.parseArgs(['bahumick2009@gamil.com', '--check-only']);
+            const args = script.parseArgs(['bahumick2009@gmail.com', '--check-only']);
             const resolved = script.resolveConfig(args, process.env);
             if (resolved.configSource !== 'DATABASE_URL environment variable') throw new Error('Provisioning did not resolve the workflow database secret.');
             const url = new URL(rawUrl);
@@ -150,7 +150,7 @@ jobs:
           const files = fs.readdirSync('.prior-check').filter(name => name === 'check.json');
           if (files.length !== 1) throw new Error('Prior run check artifact is missing or ambiguous.');
           const result = JSON.parse(fs.readFileSync(path.join('.prior-check', files[0]), 'utf8'));
-          if (result.operation !== 'check' || result.runId !== Number(process.env.PRIOR_CHECK_RUN_ID) || result.headSha !== process.env.CURRENT_SHA || result.email !== 'bahumick2009@gamil.com' || result.accountStatus !== 'NOT_FOUND' || result.allRequiredTablesPresent !== true || result.projectRef !== (process.env.PROJECT_REF || '').toLowerCase()) {
+          if (result.operation !== 'check' || result.runId !== Number(process.env.PRIOR_CHECK_RUN_ID) || result.headSha !== process.env.CURRENT_SHA || result.email !== 'bahumick2009@gmail.com' || result.accountStatus !== 'NOT_FOUND' || result.allRequiredTablesPresent !== true || result.projectRef !== (process.env.PROJECT_REF || '').toLowerCase()) {
             throw new Error('Prior check did not verify the absent account, complete schema, same project, and same commit.');
           }
           console.log('Prior check artifact verified: account absent and every required table present.');
@@ -194,7 +194,7 @@ jobs:
             }
           }
           (async () => {
-            const result = await provisionAdmin({ argv: ['bahumick2009@gamil.com', '--check-only'], logger: quietLogger, exitOnError: false });
+            const result = await provisionAdmin({ argv: ['bahumick2009@gmail.com', '--check-only'], logger: quietLogger, exitOnError: false });
             if (!result.schemaCheck || !result.schemaCheck.tableStatus || typeof result.schemaCheck.allTablesPresent !== 'boolean') {
               console.error('Read-only check failed: schema inspection returned an inconclusive result. Verify database permissions and retry.');
               process.exitCode = 1;
@@ -210,7 +210,7 @@ jobs:
               process.exitCode = 1;
               return;
             }
-            const output = { operation: process.env.OPERATION, runId: Number(process.env.CURRENT_RUN_ID), headSha: process.env.CURRENT_SHA, email: 'bahumick2009@gamil.com', accountStatus: result.status, role: result.user?.role || null, allRequiredTablesPresent: true, requiredTables: result.schemaCheck.tableStatus, targetHost: result.safeDiagnostics.targetHost, targetDatabase: result.safeDiagnostics.targetDatabase, projectRef: (process.env.PROJECT_REF || '').toLowerCase() };
+            const output = { operation: process.env.OPERATION, runId: Number(process.env.CURRENT_RUN_ID), headSha: process.env.CURRENT_SHA, email: 'bahumick2009@gmail.com', accountStatus: result.status, role: result.user?.role || null, allRequiredTablesPresent: true, requiredTables: result.schemaCheck.tableStatus, targetHost: result.safeDiagnostics.targetHost, targetDatabase: result.safeDiagnostics.targetDatabase, projectRef: (process.env.PROJECT_REF || '').toLowerCase() };
             const account = getSafeAccountStatus(result);
             output.accountStatus = account.status;
             output.role = account.role;
@@ -248,9 +248,9 @@ jobs:
           const { provisionAdmin } = require('./backend/scripts/provision-admin');
           const quietLogger = { log() {}, warn() {}, error() {} };
           (async () => {
-            const result = await provisionAdmin({ argv: ['bahumick2009@gamil.com'], logger: quietLogger, exitOnError: false });
-            if (result.status !== 'PROVISIONED' || result.user?.email !== 'bahumick2009@gamil.com' || result.user?.role !== 'admin') throw new Error('Expected new admin was not provisioned.');
-            console.log(JSON.stringify({ account: 'bahumick2009@gamil.com', status: result.status, role: 'admin' }));
+            const result = await provisionAdmin({ argv: ['bahumick2009@gmail.com'], logger: quietLogger, exitOnError: false });
+            if (result.status !== 'PROVISIONED' || result.user?.email !== 'bahumick2009@gmail.com' || result.user?.role !== 'admin') throw new Error('Expected new admin was not provisioned.');
+            console.log(JSON.stringify({ account: 'bahumick2009@gmail.com', status: result.status, role: 'admin' }));
           })().catch(() => { console.error('Admin provisioning failed. No credentials were logged.'); process.exitCode = 1; });
           NODE
 
@@ -264,8 +264,8 @@ jobs:
           const { provisionAdmin } = require('./backend/scripts/provision-admin');
           const quietLogger = { log() {}, warn() {}, error() {} };
           (async () => {
-            const result = await provisionAdmin({ argv: ['bahumick2009@gamil.com', '--check-only'], logger: quietLogger, exitOnError: false });
+            const result = await provisionAdmin({ argv: ['bahumick2009@gmail.com', '--check-only'], logger: quietLogger, exitOnError: false });
             if (result.status !== 'EXISTS' || result.user?.role !== 'admin') throw new Error('Read-only verification did not confirm the admin role.');
-            console.log(JSON.stringify({ account: 'bahumick2009@gamil.com', status: result.status, role: 'admin' }));
+            console.log(JSON.stringify({ account: 'bahumick2009@gmail.com', status: result.status, role: 'admin' }));
           })().catch(() => { console.error('Admin role verification failed. Do not assume provisioning succeeded.'); process.exitCode = 1; });
           NODE
