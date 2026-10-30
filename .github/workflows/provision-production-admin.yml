@@ -248,13 +248,30 @@ jobs:
         run: |
           set -euo pipefail
           node <<'NODE'
-          const { provisionAdmin } = require('./backend/scripts/provision-admin');
+          const { provisionAdmin, getSafeCheckDiagnostic, PASSWORD_BYTES_MIN, PASSWORD_BYTES_MAX } = require('./backend/scripts/provision-admin');
           const quietLogger = { log() {}, warn() {}, error() {} };
           (async () => {
+            if (!process.env.ADMIN_PASSWORD) {
+              console.error('Admin provisioning stopped: URBANPULSE_ADMIN_PASSWORD is missing or empty. Configure the creation password secret.');
+              process.exitCode = 1;
+              return;
+            }
+            const passwordBytes = Buffer.byteLength(process.env.ADMIN_PASSWORD);
+            if (passwordBytes < PASSWORD_BYTES_MIN || passwordBytes > PASSWORD_BYTES_MAX) {
+              console.error(`Admin provisioning stopped: URBANPULSE_ADMIN_PASSWORD must be ${PASSWORD_BYTES_MIN} to ${PASSWORD_BYTES_MAX} bytes. No password value or actual length was logged.`);
+              process.exitCode = 1;
+              return;
+            }
             const result = await provisionAdmin({ argv: ['bahumick2009@gmail.com'], logger: quietLogger, exitOnError: false });
             if (result.status !== 'PROVISIONED' || result.user?.email !== 'bahumick2009@gmail.com' || result.user?.role !== 'admin') throw new Error('Expected new admin was not provisioned.');
             console.log(JSON.stringify({ account: 'bahumick2009@gmail.com', status: result.status, role: 'admin' }));
-          })().catch(() => { console.error('Admin provisioning failed. No credentials were logged.'); process.exitCode = 1; });
+          })().catch((error) => {
+            const diagnostic = getSafeCheckDiagnostic(error);
+            const code = diagnostic.code ? ` (code ${diagnostic.code})` : '';
+            const stage = diagnostic.stage ? ` during ${diagnostic.stage}` : '';
+            console.error(`Admin provisioning failed: ${diagnostic.category}${stage}${code}. Do not retry creation until a read-only account check confirms the result. No raw error or credentials were logged.`);
+            process.exitCode = 1;
+          });
           NODE
 
       - name: Verify the new admin role
