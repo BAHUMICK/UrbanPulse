@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import './adminIssues.css';
 import {
@@ -43,6 +43,44 @@ function Issues({ onNavigate, isAdmin = false }) {
 
   // Selected issue for details & proof lightbox modal
   const [inspectIssue, setInspectIssue] = useState(null);
+  const adminDialogRef = useRef(null);
+  const inspectedIssueId = inspectIssue?.id;
+
+  useEffect(() => {
+    if (!isAdmin || inspectedIssueId == null) return undefined;
+    const dialog = adminDialogRef.current;
+    if (!dialog) return undefined;
+    const previousFocus = document.activeElement;
+    const focusable = () => Array.from(dialog.querySelectorAll(
+      'button:not(:disabled), a[href], select:not(:disabled), input:not(:disabled), video[controls], [tabindex="0"]'
+    )).filter((element) => element.getClientRects().length > 0);
+    (focusable()[0] || dialog).focus();
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setInspectIssue(null);
+      } else if (event.key === 'Tab') {
+        const elements = focusable();
+        const first = elements[0];
+        const last = elements[elements.length - 1];
+        if (!first) {
+          event.preventDefault();
+          dialog.focus();
+        } else if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [isAdmin, inspectedIssueId]);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -519,12 +557,20 @@ function Issues({ onNavigate, isAdmin = false }) {
       {/* ===================================================== */}
       {inspectIssue && (
         <div className="modal-backdrop" onClick={() => setInspectIssue(null)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+          <div
+            className={isAdmin ? 'modal-card admin-issue-dialog' : 'modal-card'}
+            ref={isAdmin ? adminDialogRef : undefined}
+            role={isAdmin ? 'dialog' : undefined}
+            aria-modal={isAdmin ? true : undefined}
+            aria-labelledby={isAdmin ? 'admin-issue-dialog-title' : undefined}
+            tabIndex={isAdmin ? -1 : undefined}
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* MODAL HEADER */}
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="intel-header-badge">INCIDENT #{inspectIssue.id}</span>
-                <span style={{ fontSize: '14px', fontWeight: 700, color: '#f1f5f9' }}>
+                <span id={isAdmin ? 'admin-issue-dialog-title' : undefined} style={{ fontSize: '14px', fontWeight: 700, color: '#f1f5f9' }}>
                   {inspectIssue.title}
                 </span>
               </div>
@@ -533,6 +579,7 @@ function Issues({ onNavigate, isAdmin = false }) {
                 className="modal-close-btn"
                 onClick={() => setInspectIssue(null)}
                 title="Close dialog"
+                aria-label={isAdmin ? 'Close issue details' : undefined}
               >
                 <IconClose size={16} />
               </button>

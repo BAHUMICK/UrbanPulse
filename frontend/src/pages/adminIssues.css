@@ -13,6 +13,11 @@
 .admin-issues .admin-issue-category { margin-top: 7px; font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
 .admin-issues .status-dropdown { min-width: 112px; }
 .admin-issues .table-responsive { max-width: 100%; overflow-x: auto; }
+.admin-issues .admin-issue-dialog .modal-header > div { min-width: 0; flex-wrap: wrap; }
+.admin-issues .admin-issue-dialog .modal-header span,
+.admin-issues .admin-issue-dialog .modal-desc-box p { overflow-wrap: anywhere; }
+.admin-issues .admin-issue-dialog .modal-close-btn { flex-shrink: 0; }
+.admin-issues .admin-issue-dialog :focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 3px; }
 @media (max-width: 700px) {
   .admin-issues .filter-selects-wrap { width: 100%; }
   .admin-issues .filter-select { max-width: 100%; }
