@@ -4,7 +4,6 @@ const pool = require('../config/db');
 const { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, authDatabaseErrorMessage, safePostgresError, cookieOptions, hashToken, readCookie, createCsrfToken } = require('../middleware/auth');
 
 const scrypt = promisify(crypto.scrypt);
-const attempts = new Map();
 const PASSWORD_BYTES_MIN = 12;
 const PASSWORD_BYTES_MAX = 128;
 

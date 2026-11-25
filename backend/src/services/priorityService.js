@@ -25,7 +25,9 @@ const CATEGORY_WEIGHTS = {
 
 /**
  * Calculate location density bonus.
- * Issues within approximately 1 km increase priority.
+ * Nearby issues increase priority when both latitude and longitude differences
+ * independently fall within 0.01 degrees; this is a coordinate bounding-box
+ * threshold, not an exact geographic-distance calculation.
  */
 function calculateDensityBonus(issue, allIssues) {
   const issueLat = Number(issue.latitude);
@@ -60,22 +62,6 @@ function calculateDensityBonus(issue, allIssues) {
 
     const lngDifference =
       issueLng - otherLng;
-
-    const distanceKm =
-      Math.sqrt(
-        Math.pow(
-          latDifference * 111,
-          2
-        ) +
-        Math.pow(
-          lngDifference *
-            111 *
-            Math.cos(
-              (issueLat * Math.PI) / 180
-            ),
-          2
-        )
-      );
 
     if (Math.abs(latDifference) <= 0.01 && Math.abs(lngDifference) <= 0.01) {
       nearbyCount++;

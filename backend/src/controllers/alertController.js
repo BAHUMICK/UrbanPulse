@@ -126,25 +126,31 @@ const updateAlertStatus = async (req, res) => {
       });
     }
 
-    const query = `
-      UPDATE alerts
-      SET status = $1
-      WHERE id = $2
-      RETURNING
-        id,
-        issue_id,
-        alert_type,
-        title,
-        message,
-        priority_score,
-        authority,
-        status,
-        created_at;
-    `;
+    await pool.query(
+      'UPDATE alerts SET status = $1 WHERE id = $2',
+      [status, alertId]
+    );
 
     const result = await pool.query(
-      query,
-      [status, alertId]
+      `SELECT
+        a.id,
+        a.issue_id,
+        a.alert_type,
+        a.title,
+        a.message,
+        a.priority_score,
+        a.authority,
+        a.status,
+        a.created_at,
+        i.sector,
+        i.category,
+        i.severity,
+        i.latitude,
+        i.longitude
+      FROM alerts a
+      INNER JOIN issues i ON a.issue_id = i.id
+      WHERE a.id = $1`,
+      [alertId]
     );
 
     if (result.rows.length === 0) {
