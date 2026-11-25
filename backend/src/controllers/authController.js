@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { promisify } = require('util');
 const pool = require('../config/db');
-const { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, authDatabaseErrorMessage, cookieOptions, hashToken, readCookie, createCsrfToken } = require('../middleware/auth');
+const { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, authDatabaseErrorMessage, safePostgresError, cookieOptions, hashToken, readCookie, createCsrfToken } = require('../middleware/auth');
 
 const scrypt = promisify(crypto.scrypt);
 const attempts = new Map();
@@ -90,11 +90,11 @@ async function register(req, res) {
       try { await client.query('ROLLBACK'); }
       catch (rollbackError) {
         discardClient = rollbackError;
-        console.error('Registration rollback failed:', rollbackError.code || rollbackError.name);
+        console.error('Registration rollback failed:', safePostgresError(rollbackError));
       }
     }
     if (error.code === '23505') return res.status(409).json({ success: false, message: 'An account with this email already exists.' });
-    console.error('Registration failed:', error.code || error.name);
+    console.error('Registration failed:', safePostgresError(error));
     return res.status(503).json({ success: false, message: authDatabaseErrorMessage(error, 'Could not create account. Check server authentication setup.') });
   } finally {
     client?.release(discardClient || undefined);
@@ -119,7 +119,7 @@ async function signIn(req, res, requiredRole = null) {
     setSessionCookie(res, token);
     return res.json({ success: true, data: { id: user.id, email: user.email, role: user.role } });
   } catch (error) {
-    console.error('Login failed:', error.code || error.name);
+    console.error('Login failed:', safePostgresError(error));
     return res.status(503).json({ success: false, message: authDatabaseErrorMessage(error, 'Could not sign in. Check server authentication setup.') });
   }
 }
@@ -135,7 +135,7 @@ async function logout(req, res) {
     try {
       await pool.query('DELETE FROM auth_sessions WHERE token_hash = $1', [hashToken(token)]);
     } catch (error) {
-      console.error('Session revocation failed:', error.code || error.name);
+      console.error('Session revocation failed:', safePostgresError(error));
       clearSessionCookie(res);
       return res.status(503).json({ success: false, message: 'Could not finish signing out. Please try again.' });
     }

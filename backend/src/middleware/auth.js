@@ -5,6 +5,20 @@ const SESSION_COOKIE = 'urbanpulse_session';
 const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 const AUTH_SCHEMA_MISSING = 'Authentication database tables are missing. Verify the intended database and apply database/migrations/001_authentication.sql.';
 
+function safePostgresError(error) {
+  const fields = ['code', 'message', 'detail', 'hint', 'where', 'schema', 'table', 'constraint', 'routine'];
+  const safe = {};
+  for (const field of fields) {
+    const value = error?.[field];
+    if (value === undefined || value === null) continue;
+    safe[field] = String(value)
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+      .replace(/(password|token|secret|credential|connection\s*string)\s*[=:]\s*[^\s,;]+/gi, '$1=[redacted]')
+      .slice(0, 2000);
+  }
+  return safe;
+}
+
 function authDatabaseErrorMessage(error, fallback) {
   if (error?.code === '42P01') return AUTH_SCHEMA_MISSING;
   if (error?.code === '42501') return 'The database role cannot access authentication tables. Check its database permissions.';
@@ -77,7 +91,7 @@ async function authenticate(req, res, next) {
     req.user = result.rows[0];
     return next();
   } catch (error) {
-    console.error('Authentication lookup failed:', error.code || error.name);
+    console.error('Authentication lookup failed:', safePostgresError(error));
     return res.status(503).json({ success: false, message: authDatabaseErrorMessage(error, 'Authentication is temporarily unavailable.') });
   }
 }
@@ -90,4 +104,4 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, authSecret, authDatabaseErrorMessage, cookieOptions, readCookie, hashToken, createCsrfToken, validCsrfToken, csrfProtection, authenticate, requireRole };
+module.exports = { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, authSecret, authDatabaseErrorMessage, safePostgresError, cookieOptions, readCookie, hashToken, createCsrfToken, validCsrfToken, csrfProtection, authenticate, requireRole };
