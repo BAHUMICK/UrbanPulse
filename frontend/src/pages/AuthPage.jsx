@@ -8,6 +8,7 @@ export default function AuthPage({ onAuthenticated, initialError = '' }) {
   const isAdminLogin = location.pathname === '/admin/login';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -54,7 +55,12 @@ export default function AuthPage({ onAuthenticated, initialError = '' }) {
           <label htmlFor="auth-email">Email address</label>
           <input id="auth-email" name="email" type="email" autoComplete="email" required maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} />
           <label htmlFor="auth-password">Password</label>
-          <input id="auth-password" name="password" type="password" autoComplete={isRegister ? 'new-password' : 'current-password'} required minLength={isRegister ? 12 : undefined} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} />
+          <div className="auth-password-field">
+            <input id="auth-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete={isRegister ? 'new-password' : 'current-password'} required minLength={isRegister ? 12 : undefined} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} />
+            <button className="auth-password-toggle" type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>
+              {showPassword ? 'Hide' : 'Show'}
+            </button>
+          </div>
           {isRegister && <p className="auth-hint">Use at least 12 characters. Accounts are created with citizen access.</p>}
           <button className="auth-submit" disabled={busy}>{busy ? 'Please wait…' : isRegister ? 'Create account' : 'Sign in'}</button>
         </form>
