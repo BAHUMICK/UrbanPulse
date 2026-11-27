@@ -8,6 +8,7 @@ import {
   updateIssueStatus,
   CIVIC_SECTORS,
   getMediaUrl,
+  openEvidence,
 } from '../services/api';
 import {
   SeverityBadge,
@@ -400,19 +401,19 @@ function Issues({ onNavigate, isAdmin = false }) {
                 {isAdmin && <th>Priority</th>}
                 <th>{isAdmin ? 'Evidence' : 'Evidence / Proof'}</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'center', width: '80px' }}>Action</th>
+                {isAdmin && <th style={{ textAlign: 'center', width: '80px' }}>Action</th>}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} role="status" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                  <td colSpan={isAdmin ? 8 : 7} role="status" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
                     {isAdmin ? 'Loading reports…' : 'Loading incident repository...'}
                   </td>
                 </tr>
               ) : paginatedIssues.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                  <td colSpan={isAdmin ? 8 : 7} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
                     {issues.length === 0 ? (isAdmin ? 'No reports have been submitted yet.' : 'You have not submitted any reports yet.') : 'No reports matched your active filters.'}
                   </td>
                 </tr>
@@ -495,7 +496,7 @@ function Issues({ onNavigate, isAdmin = false }) {
                         </div>
                       </td>
 
-                      <td style={{ textAlign: 'center' }}>
+                      {isAdmin && <td style={{ textAlign: 'center' }}>
                         <button
                           type="button"
                           className="btn-table-inspect"
@@ -505,7 +506,7 @@ function Issues({ onNavigate, isAdmin = false }) {
                           <IconEye size={13} style={{ marginRight: 3, verticalAlign: -1 }} />
                           {isAdmin ? 'Details' : 'Inspect'}
                         </button>
-                      </td>
+                      </td>}
                     </tr>
                   );
                 })
@@ -662,11 +663,13 @@ function Issues({ onNavigate, isAdmin = false }) {
                               <video
                                 src={fullUrl}
                                 controls
+                                crossOrigin="use-credentials"
                                 className="modal-video-elem"
                               />
                             ) : (
                               <img
                                 src={fullUrl}
+                                crossOrigin="use-credentials"
                                 alt={ev.file_name}
                                 className="modal-img-elem"
                               />
@@ -690,15 +693,14 @@ function Issues({ onNavigate, isAdmin = false }) {
                             <span className="modal-ev-name" title={ev.file_name}>
                               {ev.file_name}
                             </span>
-                            <a
-                              href={fullUrl}
-                              target="_blank"
-                              rel="noreferrer"
+                            <button
+                              type="button"
                               className="modal-ev-link"
                               title="Open original media in new tab"
+                              onClick={() => openEvidence(ev.file_path).catch((openError) => alert(openError.message))}
                             >
                               Open ↗
-                            </a>
+                            </button>
                           </div>
                         </div>
                       );

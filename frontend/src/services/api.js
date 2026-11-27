@@ -6,6 +6,20 @@ export const API_ORIGIN = resolveApiOrigin(API_URL);
 export const getMediaUrl = (filePath) => resolveEvidenceUrl(filePath, API_URL);
 let csrfToken = '';
 
+export async function openEvidence(filePath) {
+  const url = getMediaUrl(filePath);
+  const response = await fetchWithTimeout(url, { credentials: 'include' });
+  if (!response.ok) {
+    throw new Error(response.status === 401
+      ? 'Your session expired. Sign in again to view this evidence.'
+      : 'Evidence could not be opened. Check that the upload is available and you have access.');
+  }
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  window.open(objectUrl, '_blank', 'noopener,noreferrer');
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+}
+
 async function fetchWithTimeout(url, options) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 20000);
